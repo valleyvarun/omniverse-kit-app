@@ -1,0 +1,56 @@
+[package]
+title = "Launcher"
+version = "0.1.0"
+description = """A foundation for a base editor application."""
+keywords = ["app"]  # That makes it browsable in UI with "app" filter
+template_name = "kit_base_editor"
+
+[dependencies]
+"omni.kit.developer.bundle" = {}
+"omni.kit.mainwindow" = {}  # Main uiapp layout/window
+"omni.kit.window.console" = {}  # Console/log for debugging
+"varun.launcher.ui" = {} # Custom homepage UI
+
+[settings]
+crashreporter.compressDumpFiles = true
+telemetry.disableInternalSessionCheck = true
+telemetry.enableAnonymousAppName = true
+telemetry.enableAnonymousData = true
+privacy.externalBuild = true
+
+[settings.app]
+font.file = "${fonts}/OpenSans-SemiBold.ttf"
+font.size = 16
+window.title = "Launcher"
+
+[settings.app.environment]
+name = "Launcher"
+
+[settings.app.docks]
+autoHideTabBar = true
+noWindowMenuButton = true
+
+[settings.app.exts]
+folders.'++' = [  # Search paths for extensions.
+	"${app}/../exts",
+	"${app}/../extscache/"
+]
+
+
+########################################################################################################################
+# BEGIN GENERATED PART (Remove from 'BEGIN' to 'END' to regenerate)
+########################################################################################################################
+
+# Kit SDK Version: 109.0.3+production.263267.62477c11.gl
+
+# Version lock for all dependencies:
+[settings.app.exts]
+enabled = [
+	"omni.kit.debug.settings-1.0.2",
+	"omni.kit.dev.utilities.bundle-0.2.1",
+	"omni.kit.developer.bundle-0.2.0",
+]
+
+########################################################################################################################
+# END GENERATED PART
+########################################################################################################################
