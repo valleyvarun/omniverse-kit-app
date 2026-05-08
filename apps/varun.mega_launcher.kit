@@ -1,0 +1,88 @@
+[package]
+title = "Launcher"
+version = "0.1.0"
+description = """A foundation for a base editor application."""
+keywords = ["app"]  # That makes it browsable in UI with "app" filter
+template_name = "kit_base_editor"
+
+[dependencies]
+"omni.kit.developer.bundle" = {}
+"omni.kit.mainwindow" = {}  # Main uiapp layout/window
+"omni.kit.menu.utils" = {}
+"omni.kit.menu.common" = { order = 1000 }  # Common menu library (loads last)
+"omni.kit.menu.create" = {}  # Create menu (registers hotkeys)
+"omni.kit.menu.edit" = {}    # Edit menu (Ctrl+Z, Ctrl+Y, etc.)
+"omni.kit.menu.file" = {}    # File menu (Ctrl+S, Ctrl+O, etc.)
+"omni.kit.actions.core" = {}    # Actions registry
+"omni.kit.actions.window" = {}  # Actions browser (registers default bindings)
+"omni.kit.hotkeys.core" = {}    # Hotkey registry
+"omni.kit.hotkeys.window" = {}  # Hotkey browser (loads default keymap)
+"omni.kit.window.console" = {}  # Console/log for debugging
+"omni.kit.window.stage" = {}    # Stage outliner window
+"omni.ai.chat_usd.bundle" = {}  # Chat USD agent bundle (from kit-usd-agents)
+"varun.launcher.ui" = {} # Custom homepage UI
+
+[settings]
+crashreporter.compressDumpFiles = true
+telemetry.disableInternalSessionCheck = true
+telemetry.enableAnonymousAppName = true
+telemetry.enableAnonymousData = true
+privacy.externalBuild = true
+exts."omni.rtx.window.settings".startup.autoCreateWindow = false
+
+# Rename the Chat USD window to "Agent" so the saved dock layout picks it up.
+[settings.exts."omni.ai.langchain.widget.core"]
+window_name = "Agent"
+show_window_on_startup = true
+
+# Use the Grey Studio light rig as the viewport's default lighting on startup.
+[settings.exts."omni.kit.viewport.menubar.lighting"]
+defaultRig = "Grey Studio"
+
+[settings.app]
+font.file = "${fonts}/OpenSans-SemiBold.ttf"
+font.size = 16
+window.title = "Launcher"
+
+[settings.app.environment]
+name = "Launcher"
+
+[settings.app.docks]
+autoHideTabBar = true
+noWindowMenuButton = true
+
+[settings.app.exts]
+folders.'++' = [  # Search paths for extensions.
+	"${app}/../exts",
+	"${app}/../extscache/",
+	"C:/kit-usd-agents/_build/windows-x86_64/release/exts",
+	"C:/kit-usd-agents/_build/windows-x86_64/release/extscache",
+]
+
+[settings.app.window]
+title = "Varun Mega Launcher"
+iconPath = "${varun.launcher.ui}/data/icon.png"
+saveSizeOnExit = false
+# width = 1920
+# height = 1080
+x = -1
+y = -1
+
+
+########################################################################################################################
+# BEGIN GENERATED PART (Remove from 'BEGIN' to 'END' to regenerate)
+########################################################################################################################
+
+# Kit SDK Version: 109.0.3+production.263267.62477c11.gl
+
+# Version lock for all dependencies:
+[settings.app.exts]
+enabled = [
+	"omni.kit.debug.settings-1.0.2",
+	"omni.kit.dev.utilities.bundle-0.2.1",
+	"omni.kit.developer.bundle-0.2.0",
+]
+
+########################################################################################################################
+# END GENERATED PART
+########################################################################################################################

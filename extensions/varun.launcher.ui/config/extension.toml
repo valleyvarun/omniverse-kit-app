@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+[package]
+title = "Python UI Extension"
+version = "0.1.0"  # Semantic Versioning is used: https://semver.org/
+description = "The simplest python UI extension example. Use it as a starting point for your extensions."
+category = "Example"  # How to categorize this in the Extension Manager
+changelog = "docs/CHANGELOG.md"
+icon = "data/icon.png"  # Icon to show in the Extension Manager
+keywords = ["kit", "example", "extension", "python", "ui"]  # Search keywords for the Extension Manager
+preview_image = "data/preview.png"  # Preview to show in the Extension Manager
+readme  = "docs/README.md"  # Path (relative to the root) or content of readme markdown file for UI
+repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of the extension source repository
+
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.quicklayout" = {}
+"omni.kit.window.filepicker" = {}
+"omni.hydra.rtx" = {}
+"omni.kit.manipulator.camera" = {}
+"omni.kit.manipulator.selection" = {}
+"omni.kit.stage_templates" = {}
+"omni.kit.viewport.actions" = {}
+"omni.kit.viewport.bundle" = {}
+"omni.kit.viewport.legacy_gizmos" = {}
+"omni.kit.viewport.menubar.camera" = {}
+"omni.kit.viewport.menubar.framerate" = {}
+"omni.kit.viewport.menubar.lighting" = {}
+"omni.activity.profiler" = {}
+"omni.activity.pump" = {}
+"omni.kit.viewport.ready" = {}
+"omni.kit.viewport.rtx" = {}
+"omni.kit.viewport.scene_camera_model" = {}
+"omni.kit.viewport.window" = {}
+"omni.kit.viewport_widgets_manager" = {}
+"omni.kit.widget.layers" = {}
+"omni.usd" = {}
+
+
+[settings]
+app.content.emptyStageOnStart = false
+app.viewport.autoFrame.mode = "first_open"
+app.viewport.defaults.fillViewport = true
+# Hide the viewport stats HUD (FPS / GPU / memory / resolution) by default.
+# A dedicated menubar button in varun.launcher.ui toggles it back on.
+app.viewport.defaults.hud.visible = false
+exts."omni.kit.viewport.window".startup.disableWindowOnLoad = true
+
+
+[[python.module]]  # Main python module this extension provides, it will be publicly available as "import varun.launcher.ui"
+name = "varun.launcher.ui"
+
+
+[documentation]
+pages = [
+    "docs/Overview.md",
+    "docs/CHANGELOG.md",
+]
+
+
+[[test]]
+dependencies = [
+    "omni.kit.test",
+    "omni.kit.ui_test"  # UI testing extension
+]
+
+args = [
+]
