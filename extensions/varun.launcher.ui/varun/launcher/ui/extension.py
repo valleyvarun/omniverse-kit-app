@@ -6,20 +6,22 @@ from pathlib import Path
 import omni.ext
 
 # Launcher window and tool imports.
-from .hotkeys import HotkeyManager
-from .layout_docking import LayoutDocking
-from .startup_defaults import StartupDefaults
-from .tools.hud_toggle_button import HudToggleButton
-from .tools.drawing_plane import PlaneGridManager
-from .tools.layers import GroupRegistry, LayerRegistry, VisibilityManager
-from .tools.selection import (
+from .startup.hotkeys import HotkeyManager
+from .startup.layout_docking import LayoutDocking
+from .startup.render_mode import RenderModeMenu
+from .startup.startup_defaults import StartupDefaults
+from .tools.hud.hud_toggle_button import HudToggleButton
+from .tools.three_d_draw.drawing_plane import PlaneGridManager
+from .layers.layers import GroupRegistry, LayerRegistry, VisibilityManager
+from .tools.selection.selection import (
     LockManager,
     SelectionDirectionFilter,
     SelectionStyle,
     SelectionSync,
     ViewportXformFilter,
 )
-from .tools.stage import StageLockColumn
+from .layers.stage import StageLockColumn
+from .tools.tool_properties import ToolPropertiesWindow
 from .windows.bottom_window import BottomWindow
 from .windows.left_window import LeftWindow
 from .windows.main_window import MainWindow
@@ -38,6 +40,7 @@ class MyExtension(omni.ext.IExt):
         super().__init__()
         # Window and tool instances.
         self._bottom_window: BottomWindow | None = None
+        self._tool_properties_window: ToolPropertiesWindow | None = None
         self._left_window: LeftWindow | None = None
         self._main_window: MainWindow | None = None
         self._clayers_window: ClayersWindow | None = None
@@ -46,6 +49,7 @@ class MyExtension(omni.ext.IExt):
         self._hotkey_manager: HotkeyManager | None = None
         self._startup_defaults: StartupDefaults | None = None
         self._layout_docking: LayoutDocking | None = None
+        self._render_mode_menu: RenderModeMenu | None = None
         self._selection_style: SelectionStyle | None = None
         self._selection_direction_filter: SelectionDirectionFilter | None = None
         self._viewport_xform_filter: ViewportXformFilter | None = None
@@ -102,6 +106,7 @@ class MyExtension(omni.ext.IExt):
         self._left_window = LeftWindow()
         self._clayers_window = ClayersWindow()
         self._bottom_window = BottomWindow()
+        self._tool_properties_window = ToolPropertiesWindow()
         self._main_window = MainWindow()
 
         # Register the viewport HUD toggle button.
@@ -112,6 +117,8 @@ class MyExtension(omni.ext.IExt):
 
         # Add menu entries and hotkeys.
         self._layout_docking.add_window_menu_items()
+        self._render_mode_menu = RenderModeMenu()
+        self._render_mode_menu.register()
         self._hotkey_manager = HotkeyManager(lambda: self._top_window)
         self._hotkey_manager.register()
 
@@ -122,6 +129,10 @@ class MyExtension(omni.ext.IExt):
         if self._hotkey_manager is not None:
             self._hotkey_manager.deregister()
             self._hotkey_manager = None
+
+        if self._render_mode_menu is not None:
+            self._render_mode_menu.deregister()
+            self._render_mode_menu = None
 
         if self._layout_docking is not None:
             self._layout_docking.remove_window_menu_items()
@@ -186,6 +197,10 @@ class MyExtension(omni.ext.IExt):
         if self._bottom_window:
             self._bottom_window.destroy()
             self._bottom_window = None
+
+        if self._tool_properties_window:
+            self._tool_properties_window.destroy()
+            self._tool_properties_window = None
 
         if self._main_window:
             self._main_window.destroy()

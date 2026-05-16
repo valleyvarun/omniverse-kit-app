@@ -4,7 +4,7 @@ from typing import Any
 import omni.ui as ui
 from omni.kit.window.filepicker import FilePickerDialog
 
-from ..styles import AGENT_WINDOW_BACKGROUND_STYLE
+from ..startup.styles import AGENT_WINDOW_BACKGROUND_STYLE
 from .window import LauncherWindow
 
 

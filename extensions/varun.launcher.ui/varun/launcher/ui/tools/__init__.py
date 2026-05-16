@@ -1,17 +1,7 @@
-from .drawing_plane import DrawingPlane
-from .hud_toggle_button import HudToggleButton
-from .three_d_draw import ThreeDDrawTool
-from .tool import Tool
-from .transform_tools import OP_MOVE, OP_ROTATE, OP_SCALE, TransformTools, set_transform_op
-
-__all__ = [
-    "DrawingPlane",
-    "HudToggleButton",
-    "ThreeDDrawTool",
-    "Tool",
-    "TransformTools",
-    "set_transform_op",
-    "OP_MOVE",
-    "OP_ROTATE",
-    "OP_SCALE",
-]
+# Intentionally empty.
+#
+# Re-exporting submodule contents from this package's __init__ caused a
+# circular import: any `from .tools.X import Y` first runs this file, which
+# loads submodules that in turn do `from ..tool import Tool` -- looping
+# back through this still-partially-initialized package. Import directly
+# from submodules instead (e.g. `from .tools.tool import Tool`).

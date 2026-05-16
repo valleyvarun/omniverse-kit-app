@@ -2,7 +2,7 @@
 
 import omni.ui as ui
 
-from ..styles import AGENT_INPUT_FIELD_STYLE, MAIN_WINDOW_BACKGROUND_STYLE, TOP_INPUT_CONTAINER_STYLE
+from ..startup.styles import AGENT_INPUT_FIELD_STYLE, MAIN_WINDOW_BACKGROUND_STYLE, TOP_INPUT_CONTAINER_STYLE
 from .window import LauncherWindow
 
 

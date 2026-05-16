@@ -48,11 +48,23 @@
                       {
                         "dock_id": 13,
                         "dock_tab_bar_enabled": true,
-                        "dock_tab_bar_visible": false,
+                        "dock_tab_bar_visible": true,
                         "height": 470.0,
                         "position_x": 222.0,
                         "position_y": 96.0,
                         "selected_in_dock": true,
+                        "title": "Home",
+                        "visible": true,
+                        "width": 798.0
+                      },
+                      {
+                        "dock_id": 13,
+                        "dock_tab_bar_enabled": true,
+                        "dock_tab_bar_visible": true,
+                        "height": 470.0,
+                        "position_x": 222.0,
+                        "position_y": 96.0,
+                        "selected_in_dock": false,
                         "title": "Viewport",
                         "visible": true,
                         "width": 798.0
@@ -72,6 +84,18 @@
                         "position_y": 618.0,
                         "selected_in_dock": true,
                         "title": "Tools",
+                        "visible": true,
+                        "width": 798.0
+                      },
+                      {
+                        "dock_id": 15,
+                        "dock_tab_bar_enabled": true,
+                        "dock_tab_bar_visible": true,
+                        "height": 50.0,
+                        "position_x": 222.0,
+                        "position_y": 618.0,
+                        "selected_in_dock": false,
+                        "title": "Tool Properties",
                         "visible": true,
                         "width": 798.0
                       }

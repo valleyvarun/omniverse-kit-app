@@ -26,6 +26,7 @@ repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of th
 "omni.kit.quicklayout" = {}
 "omni.kit.window.filepicker" = {}
 "omni.hydra.rtx" = {}
+"omni.hydra.pxr" = {}  # Pixar Storm: lightweight rasterizer (no RTX), used by Performance Mode.
 "omni.kit.manipulator.camera" = {}
 "omni.kit.manipulator.selection" = {}
 "omni.kit.stage_templates" = {}

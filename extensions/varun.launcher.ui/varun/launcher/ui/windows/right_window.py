@@ -1,7 +1,7 @@
 ﻿import omni.ui as ui
 
-from ..styles import AGENT_WINDOW_BACKGROUND_STYLE
-from ..tools.c_layers import ClayersPanel
+from ..startup.styles import AGENT_WINDOW_BACKGROUND_STYLE
+from ..layers.c_layers import ClayersPanel
 from .window import LauncherWindow
 
 
