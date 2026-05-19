@@ -6,6 +6,8 @@ from pathlib import Path
 import omni.ext
 
 # Launcher window and tool imports.
+from .active_context import install_global_context_shim, uninstall_global_context_shim
+from .kit_panels.kit_panel_rebinder import KitPanelRebinder
 from .startup.hotkeys import HotkeyManager
 from .startup.layout_docking import LayoutDocking
 from .startup.render_mode import RenderModeMenu
@@ -47,6 +49,7 @@ class MyExtension(omni.ext.IExt):
         self._top_window: TopWindow | None = None
         self._hud_toggle_button: HudToggleButton | None = None
         self._hotkey_manager: HotkeyManager | None = None
+        self._kit_panel_rebinder: KitPanelRebinder | None = None
         self._startup_defaults: StartupDefaults | None = None
         self._layout_docking: LayoutDocking | None = None
         self._render_mode_menu: RenderModeMenu | None = None
@@ -112,8 +115,10 @@ class MyExtension(omni.ext.IExt):
         # Register the viewport HUD toggle button.
         self._hud_toggle_button = HudToggleButton()
 
-        # Schedule layout load and default stage creation.
-        asyncio.ensure_future(self._startup_defaults.initialize_layout_and_stage())
+        # Schedule the first-run dock layout load. Per-viewport stage +
+        # light-rig setup is owned by OpenUsdViewportManager so every
+        # viewport (including the first one) goes through the same path.
+        asyncio.ensure_future(self._startup_defaults.initialize_layout())
 
         # Add menu entries and hotkeys.
         self._layout_docking.add_window_menu_items()
@@ -122,9 +127,35 @@ class MyExtension(omni.ext.IExt):
         self._hotkey_manager = HotkeyManager(lambda: self._top_window)
         self._hotkey_manager.register()
 
+        # Reroute Kit-owned panels (right-click Create / File menu / Stage
+        # tree / Property panel / etc.) so unnamed `omni.usd.get_context()`
+        # lookups follow whichever viewport tab the user is currently in.
+        # Installed last so Kit's own startup-time subscriptions still bind
+        # to the global context the way Kit expects.
+        install_global_context_shim()
+
+        # Kit's Stage and Layer panels cache their UsdContext at creation
+        # time and never re-resolve it, so the shim alone isn't enough --
+        # this listener destroys + recreates both panels on every
+        # viewport-tab switch so they bind to the active stage.
+        self._kit_panel_rebinder = KitPanelRebinder()
+        self._kit_panel_rebinder.apply()
+        # Fire one initial rebind so the panels bind to the first
+        # viewport's named context instead of the empty global one they
+        # latched onto at Kit startup.
+        self._kit_panel_rebinder.rebind_now()
+
     # Extension shutdown.
     def on_shutdown(self) -> None:
         print("[varun.launcher.ui] shutdown")
+
+        # Restore the original `omni.usd.get_context` first so anything
+        # that tears down during shutdown sees the unpatched API.
+        uninstall_global_context_shim()
+
+        if self._kit_panel_rebinder is not None:
+            self._kit_panel_rebinder.destroy()
+            self._kit_panel_rebinder = None
 
         if self._hotkey_manager is not None:
             self._hotkey_manager.deregister()

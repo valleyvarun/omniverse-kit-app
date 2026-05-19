@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Callable, cast
 
-import omni.usd
 from omni.ui import scene as sc
 from pxr import Gf  # hoisted out of the per-mousemove raycast hot path
 
@@ -12,6 +11,7 @@ from .tool_settings import (
     RING_COLOR,
 )
 from ...layers.layers import DEFAULT_GROUND_PLANE_PATH, LayerRegistry
+from ...active_context import get_active_stage
 
 
 # ============================================================================
@@ -205,7 +205,7 @@ class _CursorScene:
     def _detect_up_axis(self) -> str:
         try:
             from pxr import UsdGeom
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage(self._viewport_api)
             if stage is not None:
                 return str(cast(Any, UsdGeom).GetStageUpAxis(stage))
         except Exception:

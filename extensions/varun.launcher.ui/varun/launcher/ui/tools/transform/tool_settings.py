@@ -26,6 +26,8 @@ import omni.ui as ui
 import omni.usd
 from pxr import Gf, Tf, Usd  # type: ignore[reportMissingTypeStubs]
 
+from ...active_context import get_active_usd_context
+
 # --- Local imports --------------------------------------------------------
 # Generic panel base + shared XYZ row builder live in `tool_properties.py`
 # alongside the dock window. `OP_*` and `TRANSFORM_OP_SETTING` come from
@@ -81,7 +83,7 @@ class TransformPropertiesPanel(ToolPropertiesPanel):
 
         # Subscribe: stage events (selection change / open / close) -> rebuild.
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             event_stream = usd_context.get_stage_event_stream()
             self._stage_sub = event_stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui transform properties"
@@ -190,7 +192,7 @@ class TransformPropertiesPanel(ToolPropertiesPanel):
     # Return the path of the first selected prim (or None).
     def _selected_path(self) -> str | None:
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             paths = usd_context.get_selection().get_selected_prim_paths()
         except Exception:
             return None
@@ -209,7 +211,7 @@ class TransformPropertiesPanel(ToolPropertiesPanel):
         if self._objects_changed_listener is not None:
             return
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             stage = usd_context.get_stage()
             if stage is not None:
                 self._objects_changed_listener = cast(Any, Tf.Notice).Register(
@@ -230,7 +232,7 @@ class TransformPropertiesPanel(ToolPropertiesPanel):
     # Read the SRT vector matching the active op (translate / rotate / scale).
     def _read_values(self, op: str, path: str) -> tuple[float, float, float] | None:
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             stage = usd_context.get_stage()
             if stage is None:
                 return None

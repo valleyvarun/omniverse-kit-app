@@ -11,6 +11,7 @@ import omni.kit.app
 import omni.ui as ui
 import omni.usd
 
+from ..active_context import get_active_stage
 from .layers import (
     DEFAULT_GROUND_PLANE_PATH,
     GROUP_ANCHOR_ROOT,
@@ -435,12 +436,16 @@ class ClayersPanel:
     # COLLECT ALL ROWS RECURSIVELY (TOP-LEVEL FIRST, GROUPS NESTED).
     def _collect_items(self) -> list[_Item]:
         items: list[_Item] = []
-        items.append(_Item(_KIND_PLANE, "Ground Plane", path=DEFAULT_GROUND_PLANE_PATH))
-
         registry = LayerRegistry.get()
         groups = GroupRegistry.get()
-        stage = cast(Any, omni.usd.get_context()).get_stage()
-        if registry is None or stage is None:
+        stage = get_active_stage()
+        # No stage on the active context (e.g. the Home tab) -> render an
+        # empty panel rather than the stand-in Ground Plane row.
+        if stage is None:
+            return items
+        items.append(_Item(_KIND_PLANE, "Ground Plane", path=DEFAULT_GROUND_PLANE_PATH))
+
+        if registry is None:
             return items
 
         # Top-level groups (sibling to ungrouped drawing planes / strokes).
@@ -474,7 +479,7 @@ class ClayersPanel:
         groups = GroupRegistry.get()
         if groups is None:
             return
-        stage = cast(Any, omni.usd.get_context()).get_stage()
+        stage = get_active_stage()
         if stage is None:
             return
         item = _Item(_KIND_GROUP, groups.get_name(gid), indent=indent, group_id=gid)

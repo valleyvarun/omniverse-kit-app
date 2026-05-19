@@ -44,6 +44,8 @@ repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of th
 "omni.kit.viewport.window" = {}
 "omni.kit.viewport_widgets_manager" = {}
 "omni.kit.widget.layers" = {}
+"omni.kit.widget.prompt" = {}  # Save / Don't Save / Cancel 3-button dialog when closing a dirty viewport.
+"omni.kit.window.file_exporter" = {}  # File picker for "Save As" on a brand-new (untitled) viewport stage.
 "omni.usd" = {}
 
 
@@ -55,6 +57,12 @@ app.viewport.defaults.fillViewport = true
 # A dedicated menubar button in varun.launcher.ui toggles it back on.
 app.viewport.defaults.hud.visible = false
 exts."omni.kit.viewport.window".startup.disableWindowOnLoad = true
+# Disable the auto-startup "RTX Loading" overlay. It listens on the global
+# UsdContext's NEW_FRAME event, but every viewport tab we spawn is bound
+# to its own named context (`viewport_1`, `viewport_2`, ...), so the
+# overlay would never get the frame it's waiting for and would stay stuck
+# on top of the first viewport forever.
+exts."omni.kit.viewport.ready".startup.enabled = false
 
 
 [[python.module]]  # Main python module this extension provides, it will be publicly available as "import varun.launcher.ui"

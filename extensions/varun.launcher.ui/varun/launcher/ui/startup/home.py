@@ -14,7 +14,7 @@ _LOGOS_DIR = Path(__file__).resolve().parent.parent / "logos"
 #   Row 1: Nucleus, Market
 # Each entry is (label, png filename); files live in `varun/launcher/ui/logos/`.
 _LOGO_GRID: list[list[tuple[str, str]]] = [
-    [("Plexus", "plexus-logo.png"), ("Agent", "apps-logo.png")],
+    [("Plexus", "plexus-logo.png"), ("Apps", "apps-logo.png")],
     [("Nucleus", "nucleus-logo.png"), ("Market", "market-logo.png")],
 ]
 
@@ -54,7 +54,13 @@ class HomeWindow:
 
     def __init__(self, on_logo_clicked: Callable[[str], None] | None = None) -> None:
         self._on_logo_clicked = on_logo_clicked
-        self._window: ui.Window | None = ui.Window("Home")
+        # The fake tab bar above the main dock slot is the only header
+        # the user sees; hide this window's own title bar so it doesn't
+        # add a redundant strip when it's selected.
+        self._window: ui.Window | None = ui.Window(
+            "Home",
+            flags=ui.WINDOW_FLAGS_NO_TITLE_BAR,
+        )
         self._build_ui()
 
     @property

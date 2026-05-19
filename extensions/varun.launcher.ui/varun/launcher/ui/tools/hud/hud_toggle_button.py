@@ -33,7 +33,11 @@ def _iter_viewport_ids() -> List[str]:
 
     ids: List[str] = []
     try:
-        for window in get_viewport_window_instances() or ():  # type: ignore[reportUnknownVariableType]
+        # IMPORTANT: pass `None` (not the default `''`) so we get viewports
+        # bound to *any* UsdContext. The launcher spawns each viewport tab
+        # on its own named context (`viewport_1`, `viewport_2`, ...), so
+        # the default empty-string filter would return nothing.
+        for window in get_viewport_window_instances(None) or ():  # type: ignore[reportUnknownVariableType]
             vp = getattr(cast(Any, window), "viewport_api", None)
             if vp is not None:
                 ids.append(str(vp.id))

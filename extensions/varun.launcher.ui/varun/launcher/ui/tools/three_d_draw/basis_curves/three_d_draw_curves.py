@@ -42,6 +42,7 @@ from ..cursor_3d import Cursor3D
 from ..escape_handler import EscapeHandler
 from ..viewport_suppression import ViewportSuppression
 from ...tool import Tool
+from ....active_context import get_active_stage, get_active_usd_context
 
 
 LOGGER = logging.getLogger(__name__)
@@ -110,6 +111,9 @@ class ThreeDDrawCurvesTool:
             tooltip=self.TOOLTIP,
             on_click=self._on_clicked,
             toggleable=True,
+            # Mutual exclusion: if another toggleable tool is picked while we
+            # are active, tear down our cursor / brush listeners cleanly.
+            on_deactivate=self.deactivate,
         )
         self._tool = tool
         return tool
@@ -172,7 +176,7 @@ class ThreeDDrawCurvesTool:
     # CLEAR THE CURRENT VIEWPORT SELECTION.
     def _clear_selection(self) -> None:
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             usd_context.get_selection().clear_selected_prim_paths()
         except Exception as exc:
             LOGGER.warning("3D Draw (curves): could not clear selection: %s", exc)
@@ -196,18 +200,17 @@ class ThreeDDrawCurvesTool:
 
     # ----- Drawing -----
 
-    # CURSOR LMB-DOWN: start a new stroke + create the live BasisCurves prim
-    # with a single control point. Subsequent ticks rewrite its `points`
-    # attr as more samples arrive.
+    # CURSOR LMB-DOWN: start a new stroke. We do NOT author the live
+    # BasisCurves prim yet -- linear/nonperiodic curves require >= 2
+    # vertices per curve, so a single-sample prim triggers Hydra and
+    # Fabric validation warnings. The prim is created lazily in `_tick`
+    # (and `_on_draw_change`) once the second sample arrives.
     def _on_draw_begin(self, pos: tuple[float, float, float]) -> None:
         self._samples = [pos]
-        self._dirty = True
+        self._dirty = False
         self._drawing = True
         # Defensive: clear any leftover live prim from a prior session.
         self._delete_prim(LIVE_STROKE_PATH)
-        # Create the live BasisCurves prim with the starting point.
-        self._define_curve(LIVE_STROKE_PATH, self._samples)
-        self._dirty = False
         self._accum = EMIT_INTERVAL
         self._start_emitting()
 
@@ -227,8 +230,9 @@ class ThreeDDrawCurvesTool:
     # prim with the final points, and delete the live prim.
     def _on_draw_end(self) -> None:
         # Final flush of the live prim (to keep it visually in sync if it
-        # survives somehow; mostly defensive).
-        if self._dirty and self._samples:
+        # survives somehow; mostly defensive). Skipped when we never
+        # accumulated enough samples to create the prim.
+        if self._dirty and len(self._samples) >= 2:
             self._write_curve(LIVE_STROKE_PATH, self._samples)
             self._dirty = False
         self._drawing = False
@@ -236,7 +240,7 @@ class ThreeDDrawCurvesTool:
         stroke_path: str | None = None
         if len(self._samples) >= 2:
             try:
-                stage = cast(Any, omni.usd.get_context()).get_stage()
+                stage = get_active_stage()
                 if stage is not None:
                     stroke_path = self._allocate_stroke_path(stage)
                     self._define_curve(stroke_path, self._samples)
@@ -292,8 +296,18 @@ class ThreeDDrawCurvesTool:
             return
         self._accum = 0.0
         # Rewrite the live curve once per tick if new samples arrived.
-        if self._dirty and self._samples:
-            self._write_curve(LIVE_STROKE_PATH, self._samples)
+        # Lazily create the prim the first tick we have >= 2 samples; up
+        # until then there's nothing valid to render.
+        if self._dirty and len(self._samples) >= 2:
+            stage = None
+            try:
+                stage = get_active_stage()
+            except Exception:
+                stage = None
+            if stage is not None and not stage.GetPrimAtPath(LIVE_STROKE_PATH).IsValid():
+                self._define_curve(LIVE_STROKE_PATH, self._samples)
+            else:
+                self._write_curve(LIVE_STROKE_PATH, self._samples)
             self._dirty = False
 
     # ----- USD authoring -----
@@ -312,7 +326,7 @@ class ThreeDDrawCurvesTool:
         samples: list[tuple[float, float, float]],
     ) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             UG = cast(Any, UsdGeom)
@@ -354,7 +368,7 @@ class ThreeDDrawCurvesTool:
         samples: list[tuple[float, float, float]],
     ) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             prim = stage.GetPrimAtPath(path)
@@ -369,9 +383,11 @@ class ThreeDDrawCurvesTool:
     # Push `samples` (Python list of (x,y,z)) to the curve's points +
     # curveVertexCounts attrs. Uses numpy + FromNumpy to avoid pybind's
     # per-element boxing penalty (same trick the production tool uses).
+    # Linear/nonperiodic BasisCurves require >= 2 vertices; callers must
+    # guard against shorter inputs.
     def _write_points(self, curves: Any, samples: list[tuple[float, float, float]]) -> None:
         n = len(samples)
-        if n < 1:
+        if n < 2:
             return
         arr = np.asarray(samples, dtype=np.float32).reshape(-1, 3)
         curves.GetPointsAttr().Set(cast(Any, Vt).Vec3fArray.FromNumpy(arr))
@@ -380,7 +396,7 @@ class ThreeDDrawCurvesTool:
     # Remove any prim at `path` from the root layer.
     def _delete_prim(self, path: str) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):

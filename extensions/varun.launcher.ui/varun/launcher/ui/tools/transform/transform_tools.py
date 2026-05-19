@@ -8,6 +8,7 @@ import carb.settings
 import omni.usd
 
 from ..tool import Tool
+from ...active_context import get_active_usd_context
 
 
 LOGGER = logging.getLogger(__name__)
@@ -56,6 +57,9 @@ class TransformTools:
                 tooltip=tooltip,
                 on_click=lambda op=op: set_transform_op(op),
                 toggleable=True,
+                # When another toggleable tool (e.g. 3D Draw) becomes active,
+                # drop the gizmo by switching the transform op to "select".
+                on_deactivate=lambda op=op: self._deactivate_op(op),
             )
             self._tools_by_op[op] = tool
             tools.append(tool)
@@ -74,7 +78,7 @@ class TransformTools:
         # the user deselects (Esc / clicks empty space) — no transform tool is
         # actually being applied without a selection.
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             event_stream = usd_context.get_stage_event_stream()
             self._selection_sub = event_stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui transform selection"
@@ -126,7 +130,7 @@ class TransformTools:
     # True iff the active stage has at least one prim selected.
     def _has_selection(self) -> bool:
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             selection = usd_context.get_selection()
             paths = selection.get_selected_prim_paths()
         except Exception:
@@ -137,3 +141,21 @@ class TransformTools:
     def _sync_active(self, op: str | None) -> None:
         for tool_op, tool in self._tools_by_op.items():
             tool.set_active(op is not None and tool_op == op)
+
+    # Called by Tool's mutual-exclusion when another toggleable tool is picked.
+    # Switch the carb op to "select" so the manipulator gizmo disappears; the
+    # setting subscription will then clear the highlight via _refresh_active.
+    def _deactivate_op(self, op: str) -> None:
+        settings = cast(Any, carb.settings.get_settings())
+        try:
+            current = settings.get(TRANSFORM_OP_SETTING) or OP_SELECT
+        except Exception:
+            current = OP_SELECT
+        if current == op:
+            set_transform_op(OP_SELECT)
+        # Drop the highlight immediately even if the setting callback is async.
+        tool = self._tools_by_op.get(op)
+        if tool is not None and tool.is_active:
+            tool.is_active = False
+            if tool._button is not None:
+                cast(Any, tool._button).selected = False

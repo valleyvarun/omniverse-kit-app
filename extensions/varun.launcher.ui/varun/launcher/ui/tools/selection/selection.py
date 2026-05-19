@@ -8,6 +8,11 @@ import omni.usd
 # Re-export LockManager from its new central home so existing imports keep
 # working. All lock/visibility/active-plane state lives in `layers.py`.
 from ...layers.layers import LockManager
+from ...active_context import (
+    add_active_context_listener,
+    get_active_usd_context,
+    remove_active_context_listener,
+)
 
 __all__ = [
     "LockManager",
@@ -225,7 +230,7 @@ class SelectionDirectionFilter:
     ) -> None:
         from pxr import Gf, Usd, UsdGeom
 
-        usd_context = cast(Any, omni.usd.get_context())
+        usd_context = get_active_usd_context(viewport_api)
         stage = usd_context.get_stage()
         if stage is None:
             return
@@ -354,7 +359,7 @@ class ViewportXformFilter:
         cls_any._SelectionManipulatorItem__request_pick = patched_request
 
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stream = ctx.get_stage_event_stream()
             self._stage_sub = stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui.viewport_xform_filter"
@@ -396,7 +401,7 @@ class ViewportXformFilter:
             return
         self._pick_pending = False
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stage = ctx.get_stage()
             if stage is None:
                 return
@@ -479,8 +484,12 @@ class SelectionSync:
 
     def apply(self) -> None:
         SelectionSync._instance = self
+        self._subscribe()
+        add_active_context_listener(self._on_active_context_changed)
+
+    def _subscribe(self) -> None:
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stream = ctx.get_stage_event_stream()
             self._stage_sub = stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui.selection_sync"
@@ -488,7 +497,25 @@ class SelectionSync:
         except Exception:
             self._stage_sub = None
 
+    # Drop the old context's subscription, attach to the new one, and
+    # echo the new context's current selection out to listeners so the
+    # C_Layers panel rebuilds its highlights against the new stage.
+    def _on_active_context_changed(self) -> None:
+        if self._stage_sub is not None:
+            try:
+                self._stage_sub.unsubscribe()
+            except Exception:
+                pass
+            self._stage_sub = None
+        self._subscribe()
+        for cb in list(self._listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
     def destroy(self) -> None:
+        remove_active_context_listener(self._on_active_context_changed)
         if self._stage_sub is not None:
             try:
                 self._stage_sub.unsubscribe()
@@ -501,7 +528,7 @@ class SelectionSync:
     # CURRENT STAGE SELECTION AS A LIST OF USD PATHS.
     def current_paths(self) -> list[str]:
         try:
-            sel = cast(Any, omni.usd.get_context()).get_selection()
+            sel = get_active_usd_context().get_selection()
             paths_obj: Any = sel.get_selected_prim_paths() or []
             return [str(p) for p in cast("list[Any]", paths_obj)]
         except Exception:
@@ -512,7 +539,7 @@ class SelectionSync:
     # get echoed its own selection back.
     def push(self, paths: list[str]) -> None:
         try:
-            sel = cast(Any, omni.usd.get_context()).get_selection()
+            sel = get_active_usd_context().get_selection()
         except Exception:
             return
         self._pushing = True

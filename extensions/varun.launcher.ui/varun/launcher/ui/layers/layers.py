@@ -6,6 +6,13 @@ from typing import Any, cast
 import omni.kit.commands
 import omni.usd
 
+from ..active_context import (
+    add_active_context_listener,
+    get_active_stage,
+    get_active_usd_context,
+    remove_active_context_listener,
+)
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -64,9 +71,11 @@ class LockManager:
         self._install_command_guard()
         self._refresh_locked_paths()
         self._apply_pickable_for_all()
+        add_active_context_listener(self._on_active_context_changed)
 
     # TEAR DOWN.
     def destroy(self) -> None:
+        remove_active_context_listener(self._on_active_context_changed)
         self._uninstall_command_guard()
         if self._stage_sub is not None:
             try:
@@ -76,6 +85,21 @@ class LockManager:
             self._stage_sub = None
         if LockManager._instance is self:
             LockManager._instance = None
+
+    # Re-subscribe to the new active context's stage events and refresh
+    # the locked-paths cache from the new stage. Fires lock listeners so
+    # the C_Layers panel rebuilds against the new stage.
+    def _on_active_context_changed(self) -> None:
+        if self._stage_sub is not None:
+            try:
+                self._stage_sub.unsubscribe()
+            except Exception:
+                pass
+            self._stage_sub = None
+        self._subscribe_stage_events()
+        self._refresh_locked_paths()
+        self._apply_pickable_for_all()
+        self._notify_listeners()
 
     # ----- public API -----
 
@@ -156,7 +180,7 @@ class LockManager:
     # SUBSCRIBE TO STAGE EVENTS.
     def _subscribe_stage_events(self) -> None:
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stream = ctx.get_stage_event_stream()
             self._stage_sub = stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui.lock_manager"
@@ -184,7 +208,7 @@ class LockManager:
         self._locked_paths.clear()
         try:
             from pxr import Usd
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             for prim in stage.Traverse():
@@ -202,7 +226,7 @@ class LockManager:
     # WRAP UsdContext.set_pickable SO A MISSING API NEVER BREAKS LOCK TOGGLING.
     def _set_pickable(self, path: str, pickable: bool) -> None:
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             ctx.set_pickable(path, pickable)
         except Exception:
             pass
@@ -212,7 +236,7 @@ class LockManager:
         if self._enforcing or not self._locked_paths:
             return
         try:
-            sel = cast(Any, omni.usd.get_context()).get_selection()
+            sel = get_active_usd_context().get_selection()
             paths_obj: Any = sel.get_selected_prim_paths() or []
             paths: list[str] = [str(p) for p in cast("list[Any]", paths_obj)]
         except Exception:
@@ -281,9 +305,11 @@ class VisibilityManager:
         VisibilityManager._instance = self
         self._subscribe_stage_events()
         self._register_notice_listener()
+        add_active_context_listener(self._on_active_context_changed)
 
     # TEAR DOWN.
     def destroy(self) -> None:
+        remove_active_context_listener(self._on_active_context_changed)
         if self._stage_sub is not None:
             try:
                 self._stage_sub.unsubscribe()
@@ -298,6 +324,18 @@ class VisibilityManager:
             self._notice_listener = None
         if VisibilityManager._instance is self:
             VisibilityManager._instance = None
+
+    # Re-subscribe to the new active context's stage events and fire
+    # listeners so visibility-dependent panels rebuild.
+    def _on_active_context_changed(self) -> None:
+        if self._stage_sub is not None:
+            try:
+                self._stage_sub.unsubscribe()
+            except Exception:
+                pass
+            self._stage_sub = None
+        self._subscribe_stage_events()
+        self._notify_listeners()
 
     # TRUE IF THE PRIM'S OWN VISIBILITY ATTR IS NOT INVISIBLE.
     def is_visible_self(self, prim: Any) -> bool:
@@ -361,7 +399,7 @@ class VisibilityManager:
     # REFIRE LISTENERS WHEN A NEW STAGE OPENS.
     def _subscribe_stage_events(self) -> None:
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stream = ctx.get_stage_event_stream()
             self._stage_sub = stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui.visibility_manager"
@@ -420,8 +458,10 @@ class LayerRegistry:
         LayerRegistry._instance = self
         self._subscribe_stage_events()
         self._register_notice_listener()
+        add_active_context_listener(self._on_active_context_changed)
 
     def destroy(self) -> None:
+        remove_active_context_listener(self._on_active_context_changed)
         if self._stage_sub is not None:
             try:
                 self._stage_sub.unsubscribe()
@@ -436,6 +476,19 @@ class LayerRegistry:
             self._notice_listener = None
         if LayerRegistry._instance is self:
             LayerRegistry._instance = None
+
+    # Re-subscribe to the new active context's stage events and fire
+    # listeners. `_children_of` reads stage at call time so no cache to
+    # rebuild here -- just nudge consumers to re-pull.
+    def _on_active_context_changed(self) -> None:
+        if self._stage_sub is not None:
+            try:
+                self._stage_sub.unsubscribe()
+            except Exception:
+                pass
+            self._stage_sub = None
+        self._subscribe_stage_events()
+        self._notify_listeners()
 
     # PATHS OF EVERY DRAWING PLANE PRIM CURRENTLY IN THE STAGE.
     def drawing_planes(self) -> list[str]:
@@ -452,7 +505,7 @@ class LayerRegistry:
     # PATH (OR SENTINEL) OF THE CURRENTLY ACTIVE DRAWING PLANE.
     def active_plane(self) -> str:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return DEFAULT_GROUND_PLANE_PATH
             data = cast("dict[str, Any]", stage.GetRootLayer().customLayerData or {})
@@ -470,7 +523,7 @@ class LayerRegistry:
     # SET THE ACTIVE DRAWING PLANE (PASS DEFAULT_GROUND_PLANE_PATH FOR GRID).
     def set_active_plane(self, path: str) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             root_layer = stage.GetRootLayer()
@@ -503,7 +556,7 @@ class LayerRegistry:
 
     def _children_of(self, root_path: str) -> list[str]:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return []
             root = stage.GetPrimAtPath(root_path)
@@ -515,7 +568,7 @@ class LayerRegistry:
 
     def _subscribe_stage_events(self) -> None:
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stream = ctx.get_stage_event_stream()
             self._stage_sub = stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui.layer_registry"
@@ -579,9 +632,11 @@ class GroupRegistry:
         self._subscribe_stage_events()
         self._load()
         self._ensure_default_group()
+        add_active_context_listener(self._on_active_context_changed)
 
     # TEAR DOWN.
     def destroy(self) -> None:
+        remove_active_context_listener(self._on_active_context_changed)
         if self._stage_sub is not None:
             try:
                 self._stage_sub.unsubscribe()
@@ -590,6 +645,21 @@ class GroupRegistry:
             self._stage_sub = None
         if GroupRegistry._instance is self:
             GroupRegistry._instance = None
+
+    # Re-subscribe to the new active context's stage events, reload the
+    # group dict from the new stage's customLayerData, ensure a default
+    # group exists on it, and fire listeners.
+    def _on_active_context_changed(self) -> None:
+        if self._stage_sub is not None:
+            try:
+                self._stage_sub.unsubscribe()
+            except Exception:
+                pass
+            self._stage_sub = None
+        self._subscribe_stage_events()
+        self._load()
+        self._ensure_default_group()
+        self._notify_listeners()
 
     # ----- public API -----
 
@@ -673,7 +743,7 @@ class GroupRegistry:
         snapshot: dict[str, bool] = {}
         lock_mgr = LockManager.get()
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
         except Exception:
             stage = None
 
@@ -702,7 +772,7 @@ class GroupRegistry:
     ) -> None:
         lock_mgr = LockManager.get()
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
         except Exception:
             stage = None
 
@@ -728,7 +798,7 @@ class GroupRegistry:
         locked: bool | None = None,
     ) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
         except Exception:
             stage = None
         for path in self.members_of(group_id):
@@ -913,7 +983,7 @@ class GroupRegistry:
     def _load(self) -> None:
         self._groups.clear()
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             data = cast("dict[str, Any]", stage.GetRootLayer().customLayerData or {})
@@ -944,7 +1014,7 @@ class GroupRegistry:
     # Serialise back to root-layer customLayerData.
     def _persist(self) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             root_layer = stage.GetRootLayer()
@@ -989,7 +1059,7 @@ class GroupRegistry:
 
     def _subscribe_stage_events(self) -> None:
         try:
-            ctx = cast(Any, omni.usd.get_context())
+            ctx = get_active_usd_context()
             stream = ctx.get_stage_event_stream()
             self._stage_sub = stream.create_subscription_to_pop(
                 self._on_stage_event, name="varun.launcher.ui.group_registry"

@@ -3,24 +3,26 @@ from typing import Any, cast
 
 import carb.settings
 import omni.kit.app
-import omni.kit.stage_templates as stage_templates
-import omni.usd
 from omni.kit.quicklayout import QuickLayout
 
 
 LOGGER = logging.getLogger(__name__)
-STAGE_TEMPLATES = cast(Any, stage_templates)
 
 # Carb settings outlive the extension's Python module, so they're the
 # reliable way to tell a true first-launch apart from a hot-reload.
 _INITIALIZED_SETTING = "/exts/varun.launcher.ui/startup_initialized"
+# Bump this whenever ``layouts/default.json`` changes shape in a way
+# users should pick up automatically (e.g. tab-bar height tweak).
+# Stored alongside ``_INITIALIZED_SETTING``; a mismatch forces a one-
+# shot reload of the layout from disk, then the new version is stored.
+_LAYOUT_VERSION_SETTING = "/exts/varun.launcher.ui/layout_version"
+_LAYOUT_VERSION = 6
 
 
-# Encapsulates the launcher's first-run defaults: dock layout, default stage,
-# default light rig, and extra FPS pacing presets.
+# Encapsulates the launcher's first-run defaults: dock layout and extra FPS
+# pacing presets. Per-viewport stage + light-rig setup lives in
+# `apps/openusd_viewport.py` so every viewport is treated identically.
 class StartupDefaults:
-    DEFAULT_LIGHT_RIG = "Grey Studio"
-
     def __init__(self, layout_file: str) -> None:
         self._layout_file = layout_file
 
@@ -30,9 +32,15 @@ class StartupDefaults:
         return not bool(settings.get(_INITIALIZED_SETTING))
 
     @staticmethod
+    def _layout_out_of_date() -> bool:
+        settings = cast(Any, carb.settings.get_settings())
+        return int(settings.get(_LAYOUT_VERSION_SETTING) or 0) != _LAYOUT_VERSION
+
+    @staticmethod
     def _mark_initialized() -> None:
         settings = cast(Any, carb.settings.get_settings())
         settings.set(_INITIALIZED_SETTING, True)
+        settings.set(_LAYOUT_VERSION_SETTING, _LAYOUT_VERSION)
 
     # Load the saved dock layout from disk. On first run we double-load with
     # a settle window so we win over other extensions' late `deferred_dock_in`
@@ -58,46 +66,16 @@ class StartupDefaults:
         except Exception:
             QuickLayout.load_file(self._layout_file)
 
-    # Open an empty default stage in the viewport. First-run only.
-    async def create_default_stage(self) -> None:
-        app = cast(Any, omni.kit.app.get_app())
-        for _ in range(5):
-            await app.next_update_async()
-
-        usd_context = cast(Any, omni.usd.get_context())
-        if usd_context.get_stage() is not None:
-            return
-        if usd_context.can_open_stage():
-            STAGE_TEMPLATES.new_stage(template=None)
-
-    # Apply the Grey Studio light rig to the active stage. First-run only.
-    async def apply_default_light_rig(self, rig_name: str | None = None) -> None:
-        try:
-            import omni.kit.commands as kit_commands
-        except ImportError:
-            return
-
-        app = cast(Any, omni.kit.app.get_app())
-        for _ in range(10):
-            await app.next_update_async()
-
-        rig = rig_name or self.DEFAULT_LIGHT_RIG
-        try:
-            cast(Any, kit_commands).execute("SetLightingMenuMode", lighting_mode=rig)
-        except Exception as exc:
-            LOGGER.warning("Failed to apply default light rig %r: %s", rig, exc)
-
-    # Startup sequence. On first launch: load layout, create stage, apply
-    # lighting. On hot-reload (extension Python module reloaded after a code
-    # edit): do nothing -- Kit's workspace re-attaches our recreated windows
-    # to their existing dock slots by title, and any further layout work
-    # would just scramble whatever the user has since arranged.
-    async def initialize_layout_and_stage(self) -> None:
-        if not self._is_first_run():
+    # Startup sequence. On first launch: load the saved dock layout. On
+    # hot-reload (extension Python module reloaded after a code edit): do
+    # nothing -- Kit's workspace re-attaches our recreated windows to
+    # their existing dock slots by title, and any further layout work
+    # would just scramble whatever the user has since arranged. Per-
+    # viewport stage + light-rig setup is handled by OpenUsdViewportManager.
+    async def initialize_layout(self) -> None:
+        if not self._is_first_run() and not self._layout_out_of_date():
             return
         await self.load_layout(first_run=True)
-        await self.create_default_stage()
-        await self.apply_default_light_rig()
         self._mark_initialized()
 
     # Add a fixed-FPS option to the viewport's Pacing Speed menu.

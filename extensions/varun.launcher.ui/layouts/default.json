@@ -46,31 +46,43 @@
                   {
                     "children": [
                       {
-                        "dock_id": 13,
-                        "dock_tab_bar_enabled": true,
-                        "dock_tab_bar_visible": true,
-                        "height": 470.0,
-                        "position_x": 222.0,
-                        "position_y": 96.0,
-                        "selected_in_dock": true,
-                        "title": "Home",
-                        "visible": true,
-                        "width": 798.0
+                        "children": [
+                          {
+                            "dock_id": 20,
+                            "dock_tab_bar_enabled": false,
+                            "dock_tab_bar_visible": false,
+                            "height": 20.0,
+                            "position_x": 222.0,
+                            "position_y": 96.0,
+                            "selected_in_dock": true,
+                            "title": "Main Tabs",
+                            "visible": true,
+                            "width": 798.0
+                          }
+                        ],
+                        "dock_id": 22,
+                        "position": "TOP"
                       },
                       {
+                        "children": [
+                          {
+                            "dock_id": 13,
+                            "dock_tab_bar_enabled": false,
+                            "dock_tab_bar_visible": false,
+                            "height": 565.0,
+                            "position_x": 222.0,
+                            "position_y": 116.0,
+                            "selected_in_dock": true,
+                            "title": "Home",
+                            "visible": true,
+                            "width": 798.0
+                          }
+                        ],
                         "dock_id": 13,
-                        "dock_tab_bar_enabled": true,
-                        "dock_tab_bar_visible": true,
-                        "height": 470.0,
-                        "position_x": 222.0,
-                        "position_y": 96.0,
-                        "selected_in_dock": false,
-                        "title": "Viewport",
-                        "visible": true,
-                        "width": 798.0
+                        "position": "BOTTOM"
                       }
                     ],
-                    "dock_id": 13,
+                    "dock_id": 21,
                     "position": "TOP"
                   },
                   {
@@ -79,9 +91,9 @@
                         "dock_id": 15,
                         "dock_tab_bar_enabled": true,
                         "dock_tab_bar_visible": true,
-                        "height": 50.0,
+                        "height": 65.0,
                         "position_x": 222.0,
-                        "position_y": 618.0,
+                        "position_y": 681.0,
                         "selected_in_dock": true,
                         "title": "Tools",
                         "visible": true,
@@ -91,9 +103,9 @@
                         "dock_id": 15,
                         "dock_tab_bar_enabled": true,
                         "dock_tab_bar_visible": true,
-                        "height": 50.0,
+                        "height": 65.0,
                         "position_x": 222.0,
-                        "position_y": 618.0,
+                        "position_y": 681.0,
                         "selected_in_dock": false,
                         "title": "Tool Properties",
                         "visible": true,

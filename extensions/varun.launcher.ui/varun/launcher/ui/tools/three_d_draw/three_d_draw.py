@@ -40,6 +40,7 @@ from .brush_config import BrushConfig
 from .cursor_3d import Cursor3D
 from .escape_handler import EscapeHandler
 from .stroke_resampler import resample_polyline
+from ...active_context import get_active_stage, get_active_usd_context
 from .tool_settings import (
     CHUNK_SPHERE_LIMIT,
     DRAW_ROOT,
@@ -112,6 +113,9 @@ class ThreeDDrawTool:
             tooltip=self.TOOLTIP,
             on_click=self._on_clicked,
             toggleable=True,
+            # Mutual exclusion: if another toggleable tool is picked while we
+            # are active, tear down our cursor / brush listeners cleanly.
+            on_deactivate=self.deactivate,
         )
         self._tool = tool
         return tool
@@ -176,7 +180,7 @@ class ThreeDDrawTool:
     # CLEAR THE CURRENT VIEWPORT SELECTION.
     def _clear_selection(self) -> None:
         try:
-            usd_context = cast(Any, omni.usd.get_context())
+            usd_context = get_active_usd_context()
             selection = usd_context.get_selection()
             selection.clear_selected_prim_paths()
         except Exception as exc:
@@ -389,7 +393,7 @@ class ThreeDDrawTool:
     # UsdGeom.Points prim.
     def _create_live_parent(self) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):
@@ -404,7 +408,7 @@ class ThreeDDrawTool:
     # Returns the chunk prim path, or None on failure.
     def _create_chunk_points(self, chunk_index: int) -> str | None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return None
             chunk_path = f"{LIVE_STROKE_PATH}/Chunk_{chunk_index:03d}"
@@ -486,7 +490,7 @@ class ThreeDDrawTool:
         if end <= start or self._positions is None:
             return
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             prim = stage.GetPrimAtPath(chunk_path)
@@ -518,7 +522,7 @@ class ThreeDDrawTool:
         if self._positions is None or self._count <= 0:
             return None
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return None
             stroke_path = self._allocate_stroke_path(stage)
@@ -536,7 +540,7 @@ class ThreeDDrawTool:
     # Remove any prim at `path` from the root layer.
     def _delete_prim(self, path: str) -> None:
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is None:
                 return
             with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):

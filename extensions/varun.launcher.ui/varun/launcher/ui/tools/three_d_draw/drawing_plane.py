@@ -4,11 +4,11 @@ import logging
 from typing import Any, cast
 
 import omni.kit.app
-import omni.usd
 from omni.ui import scene as sc
 from pxr import Gf, Sdf, UsdGeom, UsdShade, Vt
 
 from ..tool import Tool
+from ...active_context import get_active_stage
 
 
 LOGGER = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class PlaneRegistry:
     @classmethod
     def info_for_path(cls, path: str) -> "tuple[Gf.Vec3d, Gf.Vec3d] | None":
         try:
-            stage = cast(Any, omni.usd.get_context()).get_stage()
+            stage = get_active_stage()
             if stage is not None:
                 prim = stage.GetPrimAtPath(path)
                 if prim and prim.IsValid():
@@ -86,7 +86,7 @@ class DrawingPlane:
 
     # Spawn one purple semi-transparent plane in the active stage.
     def create(self) -> None:
-        stage = cast(Any, omni.usd.get_context()).get_stage()
+        stage = get_active_stage()
         if stage is None:
             LOGGER.warning("DrawingPlane: no active stage.")
             return
