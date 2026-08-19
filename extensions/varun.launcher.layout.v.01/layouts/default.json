@@ -1,0 +1,163 @@
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "dock_id": 11,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false,
+                "height": 75.0,
+                "position_x": 0.0,
+                "position_y": 36.0,
+                "selected_in_dock": true,
+                "title": "top_window",
+                "visible": true,
+                "width": 1145.0
+              }
+            ],
+            "dock_id": 11,
+            "position": "TOP"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "dock_id": 12,
+                    "dock_tab_bar_enabled": false,
+                    "dock_tab_bar_visible": false,
+                    "height": 655.0,
+                    "position_x": 0.0,
+                    "position_y": 111.0,
+                    "selected_in_dock": true,
+                    "title": "left_window",
+                    "visible": true,
+                    "width": 130.0
+                  }
+                ],
+                "dock_id": 12,
+                "position": "LEFT"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "dock_id": 21,
+                            "dock_tab_bar_enabled": false,
+                            "dock_tab_bar_visible": false,
+                            "height": 30.0,
+                            "position_x": 130.0,
+                            "position_y": 111.0,
+                            "selected_in_dock": true,
+                            "title": "tabs_window",
+                            "visible": true,
+                            "width": 1015.0
+                          }
+                        ],
+                        "dock_id": 21,
+                        "position": "TOP"
+                      },
+                      {
+                        "children": [
+                          {
+                            "dock_id": 13,
+                            "dock_tab_bar_enabled": false,
+                            "dock_tab_bar_visible": false,
+                            "height": 560.0,
+                            "position_x": 130.0,
+                            "position_y": 141.0,
+                            "selected_in_dock": true,
+                            "title": "main_window",
+                            "visible": true,
+                            "width": 1015.0
+                          }
+                        ],
+                        "dock_id": 13,
+                        "position": "BOTTOM"
+                      }
+                    ],
+                    "dock_id": 22,
+                    "position": "TOP"
+                  },
+                  {
+                    "children": [
+                      {
+                        "dock_id": 14,
+                        "dock_tab_bar_enabled": false,
+                        "dock_tab_bar_visible": false,
+                        "height": 65.0,
+                        "position_x": 130.0,
+                        "position_y": 701.0,
+                        "selected_in_dock": true,
+                        "title": "bottom_window",
+                        "visible": true,
+                        "width": 1015.0
+                      }
+                    ],
+                    "dock_id": 14,
+                    "position": "BOTTOM"
+                  }
+                ],
+                "dock_id": 15,
+                "position": "RIGHT"
+              }
+            ],
+            "dock_id": 16,
+            "position": "BOTTOM"
+          }
+        ],
+        "dock_id": 17,
+        "position": "LEFT"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "dock_id": 18,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false,
+                "height": 180.0,
+                "position_x": 1145.0,
+                "position_y": 36.0,
+                "selected_in_dock": true,
+                "title": "right_top_window",
+                "visible": true,
+                "width": 295.0
+              }
+            ],
+            "dock_id": 18,
+            "position": "TOP"
+          },
+          {
+            "children": [
+              {
+                "dock_id": 19,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false,
+                "height": 550.0,
+                "position_x": 1145.0,
+                "position_y": 216.0,
+                "selected_in_dock": true,
+                "title": "right_bottom_window",
+                "visible": true,
+                "width": 295.0
+              }
+            ],
+            "dock_id": 19,
+            "position": "BOTTOM"
+          }
+        ],
+        "dock_id": 20,
+        "position": "RIGHT"
+      }
+    ],
+    "dock_id": 3358485147
+  }
+]

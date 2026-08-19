@@ -8,6 +8,25 @@ from typing import Any, Callable, cast
 LOGGER = logging.getLogger(__name__)
 
 
+def _stage_is_untitled(ctx: Any) -> bool:
+    """True when the stage should be treated as 'never saved by user'.
+
+    Tabs back onto anonymous in-memory ``Usd.Stage`` objects until the
+    first user-initiated Save; their root layer's identifier starts
+    with ``anon:``. We use that as the "show file picker" signal.
+    """
+    try:
+        if bool(ctx.is_new_stage()):
+            return True
+    except Exception:
+        return True
+    try:
+        identifier = str(ctx.get_stage().GetRootLayer().identifier)
+    except Exception:
+        return False
+    return identifier.startswith("anon:")
+
+
 def show_save_prompt(
     title: str,
     ctx: Any,
@@ -74,14 +93,14 @@ def save_then_close(
             if on_cancelled is not None:
                 on_cancelled()
 
-    is_new = True
-    try:
-        is_new = bool(ctx.is_new_stage())
-    except Exception:
-        pass
+    # ``is_new`` here means "treat as untitled => show file picker". A
+    # stage opened from a ``temp_usd/`` file is still effectively
+    # untitled even though Kit's ``is_new_stage()`` returns False, so
+    # ``_stage_is_untitled`` adds that extra check on top.
+    is_new = _stage_is_untitled(ctx)
 
-    # Backed by a file -> save in place via the async wrapper so we get
-    # a proper (result, err, layers) tuple back.
+    # Backed by a file the user picked -> save in place via the async
+    # wrapper so we get a proper (result, err, layers) tuple back.
     if not is_new:
         async def _save_in_place() -> None:
             try:

@@ -64,6 +64,7 @@ class MainWindow:
         )
         self._viewports = OpenUsdViewportManager(
             on_dock_changed=self._on_viewport_dock,
+            on_tab_renamed=self._on_viewport_tab_renamed,
         )
 
         # Seed the tab bar.
@@ -107,6 +108,15 @@ class MainWindow:
 
     def _on_viewport_dock(self, name: str, is_selected: bool) -> None:
         self._on_dock_changed(name, is_selected)
+
+    def _on_viewport_tab_renamed(self, old_name: str, new_name: str) -> None:
+        # A viewport tab was saved to (or opened from) a file, so its
+        # label changes from "Viewport N" to the file name. Keep our
+        # active-tab tracking and the fake tab bar in sync.
+        if self._active_tab == old_name:
+            self._active_tab = new_name
+        if self._main_tabs is not None:
+            self._main_tabs.rename_tab(old_name, new_name)
 
     def _on_dock_changed(self, tab: str, is_selected: bool) -> None:
         if not is_selected:

@@ -252,6 +252,21 @@ class MainTabsWindow:
         self._active = name
         self._refresh()
 
+    def rename_tab(self, old_name: str, new_name: str) -> None:
+        """Rename a tab in place, keeping its position, closable flag and
+        active state. No-op if ``old_name`` is missing, names are equal, or
+        ``new_name`` already exists."""
+        if old_name == new_name:
+            return
+        if old_name not in self._tab_names or new_name in self._tab_names:
+            return
+        idx = self._tab_names.index(old_name)
+        self._tab_names[idx] = new_name
+        self._closable[new_name] = self._closable.pop(old_name, True)
+        if self._active == old_name:
+            self._active = new_name
+        self._refresh()
+
     # LIFECYCLE -----------------------------------------------------------
 
     def destroy(self) -> None:

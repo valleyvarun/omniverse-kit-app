@@ -36,8 +36,21 @@ window_name = "Agent"
 show_window_on_startup = true
 
 # Use the Grey Studio light rig as the viewport's default lighting on startup.
+# Kit's auto-rig handler (`__on_stage_open` in
+# `omni.kit.viewport.menubar.lighting`) fights our shared-context
+# architecture: on the FIRST attach of a new in-memory stage it applies
+# the default rig, but on every RE-ATTACH it sees lights already present
+# in the session layer and calls SetLightingMenuModeCommand with an
+# empty mode -- which REMOVES the rig. The rig then oscillates between
+# "Grey Studio" and "Stage Lights" as the user switches tabs. Disabling
+# auto-rig makes Kit a no-op on re-attach (it just re-applies whatever
+# the per-stage cache already holds, which is "Grey Studio"), and we
+# apply Grey Studio ourselves once on first focus.
 [settings.exts."omni.kit.viewport.menubar.lighting"]
 defaultRig = "Grey Studio"
+
+[settings.persistent.exts."omni.kit.viewport.menubar.lighting".autoLightRig]
+enabled = false
 
 [settings.app]
 font.file = "${fonts}/OpenSans-SemiBold.ttf"

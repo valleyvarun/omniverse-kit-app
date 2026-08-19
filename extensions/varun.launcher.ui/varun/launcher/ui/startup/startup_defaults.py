@@ -16,7 +16,7 @@ _INITIALIZED_SETTING = "/exts/varun.launcher.ui/startup_initialized"
 # Stored alongside ``_INITIALIZED_SETTING``; a mismatch forces a one-
 # shot reload of the layout from disk, then the new version is stored.
 _LAYOUT_VERSION_SETTING = "/exts/varun.launcher.ui/layout_version"
-_LAYOUT_VERSION = 6
+_LAYOUT_VERSION = 7
 
 
 # Encapsulates the launcher's first-run defaults: dock layout and extra FPS
