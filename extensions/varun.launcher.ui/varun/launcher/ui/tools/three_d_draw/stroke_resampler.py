@@ -5,7 +5,12 @@ single tick into evenly spaced brush-stamp centers, with a `carry` value
 that preserves spacing continuity across ticks.
 """
 
+# Python & library imports
 from __future__ import annotations
+
+# ----------------------------------------------------------------------
+# 1. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 # Resample a polyline into uniformly spaced stamps along its arc length.

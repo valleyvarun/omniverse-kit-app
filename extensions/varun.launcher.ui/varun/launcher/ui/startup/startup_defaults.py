@@ -1,10 +1,15 @@
+# Python & library imports
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.settings
 import omni.kit.app
 from omni.kit.quicklayout import QuickLayout
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,23 +24,32 @@ _LAYOUT_VERSION_SETTING = "/exts/varun.launcher.ui/layout_version"
 _LAYOUT_VERSION = 7
 
 
+# ----------------------------------------------------------------------
+# 2. STARTUP DEFAULTS
+# ----------------------------------------------------------------------
+
+
 # Encapsulates the launcher's first-run defaults: dock layout and extra FPS
 # pacing presets. Per-viewport stage + light-rig setup lives in
 # `apps/openusd_viewport.py` so every viewport is treated identically.
 class StartupDefaults:
+    # Store the default layout file path.
     def __init__(self, layout_file: str) -> None:
         self._layout_file = layout_file
 
+    # Check whether launcher initialization has been recorded.
     @staticmethod
     def _is_first_run() -> bool:
         settings = cast(Any, carb.settings.get_settings())
         return not bool(settings.get(_INITIALIZED_SETTING))
 
+    # Compare the saved layout version with the current version.
     @staticmethod
     def _layout_out_of_date() -> bool:
         settings = cast(Any, carb.settings.get_settings())
         return int(settings.get(_LAYOUT_VERSION_SETTING) or 0) != _LAYOUT_VERSION
 
+    # Record successful initialization and the layout version.
     @staticmethod
     def _mark_initialized() -> None:
         settings = cast(Any, carb.settings.get_settings())
@@ -83,7 +97,9 @@ class StartupDefaults:
     def add_fps_pacing_preset(fps: int, name: str | None = None) -> None:
         # Locate the preset list used by the framerate menubar.
         try:
-            from omni.kit.window.preferences.scripts.pages import developer_page as presets_module
+            from omni.kit.window.preferences.scripts.pages import (
+                developer_page as presets_module,
+            )
         except ImportError:
             try:
                 from omni.kit.window.preferences.scripts.pages import (  # type: ignore[no-redef]

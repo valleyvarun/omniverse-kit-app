@@ -24,16 +24,26 @@ That guarantees the call resolves to the viewport the input event came
 from, even if the user has since clicked into a different tab.
 """
 
+# Python & library imports
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.usd
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Name of the dedicated, stage-less UsdContext used when the Home tab is
 # the active tab. Home is not a viewport -- it has no stage -- so any
 # Kit-owned panel that follows the active context (Stage, Layer, etc.)
 # binds to this empty context and renders empty.
 HOME_CONTEXT_NAME: str = "home"
+
+
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def ensure_home_context() -> Any:
@@ -57,6 +67,10 @@ def ensure_home_context() -> Any:
         return None
 
 
+# ----------------------------------------------------------------------
+# 3. SHARED STATE & EXPORTS
+# ----------------------------------------------------------------------
+
 # Explicitly-tracked active viewport context name. Updated from
 # `OpenUsdViewportManager` whenever a viewport tab becomes the selected
 # tab in its dock group. This is the *authoritative* source of truth --
@@ -74,6 +88,11 @@ _active_context_name: str = ""
 # here to re-sync to the new active stage; the C_Layers panel subscribes
 # here to rebuild itself.
 _ACTIVE_CONTEXT_LISTENERS: list[Any] = []
+
+
+# ----------------------------------------------------------------------
+# 4. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def add_active_context_listener(callback: Any) -> None:
@@ -193,9 +212,18 @@ def get_active_stage(viewport_api: Any = None) -> Any | None:
 #
 # Install once at extension startup; the original is restored on shutdown.
 
+# ----------------------------------------------------------------------
+# 5. SHARED STATE & EXPORTS
+# ----------------------------------------------------------------------
+
 # Lowercase deliberately: pylance treats UPPER_CASE module-level names as
 # Final, but this is rebound by install/uninstall.
 _original_get_context: Any = None
+
+
+# ----------------------------------------------------------------------
+# 6. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def _resolve_active_context_name() -> str:

@@ -12,10 +12,13 @@ Common scaffolding (centering, base styling, window flags) lives in
 `popup_windows.PopupWindow`.
 """
 
+# Python & library imports
 from typing import Callable
 
+# Omniverse & USD imports
 import omni.ui as ui
 
+# Local imports
 from ...startup.styles import AGENT_WINDOW_BACKGROUND_STYLE
 from .popup_windows import (
     LABEL_GAP,
@@ -26,6 +29,9 @@ from .popup_windows import (
     PopupWindow,
 )
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # App entries shown in the Favorites grid. Each entry is
 # (label, png filename); files live in `varun/launcher/ui/logos/`.
@@ -110,6 +116,11 @@ _DIVIDER_STYLE = {
 }
 
 
+# ----------------------------------------------------------------------
+# 2. APPS WINDOW
+# ----------------------------------------------------------------------
+
+
 class AppsWindow(PopupWindow):
     """Floating `Apps` popup centered over the main window."""
 
@@ -117,12 +128,14 @@ class AppsWindow(PopupWindow):
     WINDOW_WIDTH = 820
     WINDOW_HEIGHT = 480
 
+    # Store the app-launch callback for this popup.
     def __init__(self, on_app_clicked: Callable[[str], None] | None = None) -> None:
         super().__init__()
         self._on_app_clicked = on_app_clicked
 
     # SUBCLASS HOOK -------------------------------------------------------
 
+    # Build the search header, divider, and favorite apps.
     def _build_body(self) -> None:
         # Full-bleed panel background so the popup reads as one surface
         # rather than ImGui's default flat grey.
@@ -136,6 +149,7 @@ class AppsWindow(PopupWindow):
 
     # INTERNAL ------------------------------------------------------------
 
+    # Build the panel header.
     def _build_header(self) -> None:
         with ui.HStack(height=_HEADER_HEIGHT):
             ui.Spacer(width=_HEADER_HORIZONTAL_PAD)
@@ -148,6 +162,7 @@ class AppsWindow(PopupWindow):
                 ui.Spacer(height=_HEADER_VERTICAL_PAD)
             ui.Spacer(width=_HEADER_HORIZONTAL_PAD)
 
+    # Build the search icon and text field.
     def _build_search_field(self) -> None:
         # Magnifying-glass glyph + StringField stacked horizontally inside
         # a single rounded "pill" background (matches the Agent input pill).
@@ -165,6 +180,7 @@ class AppsWindow(PopupWindow):
                 ui.StringField(style=_SEARCH_FIELD_STYLE)
                 ui.Spacer(width=8)
 
+    # Place the store icon and label over its click target.
     def _build_go_to_store_button(self) -> None:
         with ui.ZStack(width=_STORE_BUTTON_WIDTH):
             ui.Rectangle(style=_PILL_STYLE)
@@ -195,15 +211,18 @@ class AppsWindow(PopupWindow):
                 )
                 ui.Spacer(width=14)
 
+    # Draw the separator below the header.
     def _build_divider(self) -> None:
         with ui.HStack(height=1):
             ui.Rectangle(height=1, style=_DIVIDER_STYLE)
 
+    # Add spacing above the favorite app grid.
     def _build_favorites_section(self) -> None:
         with ui.VStack():
             ui.Spacer(height=_GRID_VERTICAL_PAD)
             self._build_favorites_grid()
 
+    # Draw the section title and disclosure marker.
     def _build_section_header(self, title: str) -> None:
         with ui.HStack(height=_SECTION_HEADER_HEIGHT):
             ui.Spacer(width=_SECTION_PAD_X)
@@ -217,6 +236,7 @@ class AppsWindow(PopupWindow):
             ui.Label(title, style=_SECTION_HEADER_LABEL_STYLE)
             ui.Spacer()
 
+    # Arrange favorite apps in a single row.
     def _build_favorites_grid(self) -> None:
         cell_height = _APP_ICON_SIZE + LABEL_GAP + LABEL_HEIGHT
         with ui.HStack(height=cell_height):
@@ -227,6 +247,7 @@ class AppsWindow(PopupWindow):
                 self._build_app_cell(label, filename)
             ui.Spacer()
 
+    # Build an app's logo button and label.
     def _build_app_cell(self, label: str, filename: str) -> None:
         with ui.VStack(width=_APP_ICON_SIZE):
             icon_path = LOGOS_DIR / filename
@@ -247,10 +268,12 @@ class AppsWindow(PopupWindow):
                 style=LABEL_STYLE,
             )
 
+    # Forward the chosen app to the owning window.
     def _handle_click(self, label: str) -> None:
         if self._on_app_clicked is not None:
             self._on_app_clicked(label)
 
+    # Reserved for the store action.
     def _handle_go_to_store(self) -> None:
         # Placeholder; wire to a real store action when one exists.
         pass

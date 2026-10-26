@@ -1,10 +1,16 @@
+# Python & library imports
 from pathlib import Path
 from typing import Callable
 
+# Omniverse & USD imports
 import omni.ui as ui
 
+# Local imports
 from .styles import AGENT_WINDOW_BACKGROUND_STYLE
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Resolve to <python_package>/logos/<name>.png (sibling of the `startup` package).
 _LOGOS_DIR = Path(__file__).resolve().parent.parent / "logos"
@@ -44,6 +50,11 @@ _LABEL_STYLE = {
 }
 
 
+# ----------------------------------------------------------------------
+# 2. HOME WINDOW
+# ----------------------------------------------------------------------
+
+
 class HomeWindow:
     """Home landing page shown in the main panel on app startup.
 
@@ -52,6 +63,7 @@ class HomeWindow:
     with the 3D viewport.
     """
 
+    # Create the Home window and connect destination callbacks.
     def __init__(self, on_logo_clicked: Callable[[str], None] | None = None) -> None:
         self._on_logo_clicked = on_logo_clicked
         # The fake tab bar above the main dock slot is the only header
@@ -68,6 +80,7 @@ class HomeWindow:
         """The underlying ui.Window, exposed so MainWindow can hook dock callbacks."""
         return self._window
 
+    # Center the destination logos and labels on the Home background.
     def _build_ui(self) -> None:
         if self._window is None:
             return
@@ -91,6 +104,7 @@ class HomeWindow:
                             ui.Spacer()
                     ui.Spacer()
 
+    # Stack a logo button above its label.
     def _build_logo_cell(self, label: str, filename: str) -> None:
         with ui.VStack(width=_LOGO_BUTTON_SIZE):
             self._build_logo_button(label, filename)
@@ -102,6 +116,7 @@ class HomeWindow:
                 style=_LABEL_STYLE,
             )
 
+    # Create the clickable destination logo.
     def _build_logo_button(self, label: str, filename: str) -> None:
         icon_path = _LOGOS_DIR / filename
         ui.Button(
@@ -114,10 +129,12 @@ class HomeWindow:
             style=_LOGO_BUTTON_STYLE,
         )
 
+    # Forward the selected destination to the main window.
     def _handle_click(self, label: str) -> None:
         if self._on_logo_clicked is not None:
             self._on_logo_clicked(label)
 
+    # Destroy the Home window and release its handle.
     def destroy(self) -> None:
         if self._window is not None:
             self._window.destroy()

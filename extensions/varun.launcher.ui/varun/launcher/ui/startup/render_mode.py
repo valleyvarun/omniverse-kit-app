@@ -17,15 +17,20 @@ The active mode is persisted to a carb setting so the launcher remembers it
 across runs of the same app session.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.settings
 import omni.kit.menu.utils
 from omni.kit.menu.utils import MenuItemDescription
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 MENU_UTILS = cast(Any, omni.kit.menu.utils)
@@ -46,6 +51,12 @@ MODE_PERFORMANCE = "performance"
 MODE_ULTRA_LIGHT = "ultra_light"
 
 
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
+
+
+# Apply renderer settings and log individual failures.
 def _apply_settings(values: dict[str, object]) -> None:
     settings = cast(Any, carb.settings.get_settings())
     for key, value in values.items():
@@ -132,14 +143,21 @@ def apply_ultra_light_mode() -> None:
     )
 
 
+# ----------------------------------------------------------------------
+# 3. RENDER MODE MENU
+# ----------------------------------------------------------------------
+
+
 class RenderModeMenu:
     """Adds three render-mode entries under the `Rendering` menu."""
 
     MENU_NAME = "Rendering"
 
+    # Keep handles to the render-mode menu entries.
     def __init__(self) -> None:
         self._items: list[MenuItemDescription] = []
 
+    # Add Quality, Performance, and Ultra Light choices.
     def register(self) -> None:
         self._items = [
             MenuItemDescription(
@@ -157,6 +175,7 @@ class RenderModeMenu:
         ]
         MENU_UTILS.add_menu_items(self._items, name=self.MENU_NAME)
 
+    # Remove the render-mode menu entries.
     def deregister(self) -> None:
         if self._items:
             MENU_UTILS.remove_menu_items(self._items, name=self.MENU_NAME)

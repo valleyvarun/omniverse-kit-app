@@ -1,11 +1,14 @@
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.kit.commands
 import omni.usd
 
+# Local imports
 from ..active_context import (
     add_active_context_listener,
     get_active_stage,
@@ -13,6 +16,9 @@ from ..active_context import (
     remove_active_context_listener,
 )
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,11 +51,17 @@ DEFAULT_STROKE_GROUP_NAME = "Default Drawing"
 _DELETE_COMMANDS = {"DeletePrims", "DeletePrimsCommand"}
 
 
+# ----------------------------------------------------------------------
+# 2. LOCK MANAGER
+# ----------------------------------------------------------------------
+
+
 # CENTRAL OWNER OF LOCK STATE; ENFORCES IT ACROSS THE APP.
 class LockManager:
     # Singleton handle for the column UI.
     _instance: "LockManager | None" = None
 
+    # Track lock enforcement, cached paths, and listeners.
     def __init__(self) -> None:
         self._stage_sub: Any = None
         self._orig_execute: Any = None
@@ -60,6 +72,7 @@ class LockManager:
         # Listeners notified whenever lock state changes.
         self._listeners: list[Any] = []
 
+    # Return the shared manager instance.
     @classmethod
     def get(cls) -> "LockManager | None":
         return cls._instance
@@ -102,6 +115,8 @@ class LockManager:
         self._notify_listeners()
 
     # ----- public API -----
+
+    # --- LOCK QUERIES AND CHANGES ---
 
     # TRUE IF THE PRIM ITSELF HAS THE LOCK CUSTOMDATA AUTHORED.
     def is_locked_self(self, prim: Any) -> bool:
@@ -177,6 +192,8 @@ class LockManager:
 
     # ----- internals -----
 
+    # --- STAGE EVENTS AND LOCK ENFORCEMENT ---
+
     # SUBSCRIBE TO STAGE EVENTS.
     def _subscribe_stage_events(self) -> None:
         try:
@@ -208,6 +225,7 @@ class LockManager:
         self._locked_paths.clear()
         try:
             from pxr import Usd
+
             stage = get_active_stage()
             if stage is None:
                 return
@@ -285,17 +303,24 @@ class LockManager:
         self._orig_execute = None
 
 
+# ----------------------------------------------------------------------
+# 3. VISIBILITY MANAGER
+# ----------------------------------------------------------------------
+
+
 # CENTRAL OWNER OF VISIBILITY STATE. WRAPS USDGEOM.IMAGEABLE VISIBILITY SO
 # CHANGES MADE FROM STAGE'S EYE COLUMN, FROM C_LAYERS, OR FROM ANYWHERE ELSE
 # ALL FLOW THROUGH (AND NOTIFY) THE SAME LISTENERS.
 class VisibilityManager:
     _instance: "VisibilityManager | None" = None
 
+    # Track visibility subscriptions and listeners.
     def __init__(self) -> None:
         self._stage_sub: Any = None
         self._notice_listener: Any = None
         self._listeners: list[Any] = []
 
+    # Return the shared manager instance.
     @classmethod
     def get(cls) -> "VisibilityManager | None":
         return cls._instance
@@ -337,10 +362,13 @@ class VisibilityManager:
         self._subscribe_stage_events()
         self._notify_listeners()
 
+    # --- VISIBILITY QUERIES AND CHANGES ---
+
     # TRUE IF THE PRIM'S OWN VISIBILITY ATTR IS NOT INVISIBLE.
     def is_visible_self(self, prim: Any) -> bool:
         try:
             from pxr import UsdGeom
+
             imageable: Any = cast(Any, UsdGeom).Imageable(prim)
             if not imageable:
                 return True
@@ -355,6 +383,7 @@ class VisibilityManager:
     def is_visible(self, prim: Any) -> bool:
         try:
             from pxr import UsdGeom
+
             imageable: Any = cast(Any, UsdGeom).Imageable(prim)
             if not imageable:
                 return True
@@ -367,6 +396,7 @@ class VisibilityManager:
     def set_visible(self, prim: Any, visible: bool) -> None:
         try:
             from pxr import UsdGeom
+
             imageable: Any = cast(Any, UsdGeom).Imageable(prim)
             if not imageable:
                 return
@@ -383,12 +413,14 @@ class VisibilityManager:
         if callback not in self._listeners:
             self._listeners.append(callback)
 
+    # Remove a previously registered callback.
     def remove_listener(self, callback: Any) -> None:
         try:
             self._listeners.remove(callback)
         except ValueError:
             pass
 
+    # Notify listeners using a stable callback list.
     def _notify_listeners(self) -> None:
         for cb in list(self._listeners):
             try:
@@ -407,6 +439,7 @@ class VisibilityManager:
         except Exception:
             self._stage_sub = None
 
+    # Refresh visibility listeners when a stage opens.
     def _on_stage_event(self, event: Any) -> None:
         try:
             if int(event.type) == int(omni.usd.StageEventType.OPENED):
@@ -419,6 +452,7 @@ class VisibilityManager:
     def _register_notice_listener(self) -> None:
         try:
             from pxr import Tf, Usd
+
             self._notice_listener = cast(Any, Tf).Notice.Register(
                 cast(Any, Usd).Notice.ObjectsChanged,
                 self._on_objects_changed,
@@ -427,6 +461,7 @@ class VisibilityManager:
         except Exception:
             self._notice_listener = None
 
+    # Notify listeners when a prim's visibility changes.
     def _on_objects_changed(self, notice: Any, _stage: Any) -> None:
         try:
             changed = list(notice.GetChangedInfoOnlyPaths()) + list(notice.GetResyncedPaths())
@@ -441,25 +476,34 @@ class VisibilityManager:
                 continue
 
 
+# ----------------------------------------------------------------------
+# 4. LAYER REGISTRY
+# ----------------------------------------------------------------------
+
+
 # CENTRAL REGISTRY OF DRAWING PLANES, STROKES, AND THE ACTIVE DRAWING PLANE.
 class LayerRegistry:
     _instance: "LayerRegistry | None" = None
 
+    # Track drawing-layer subscriptions and listeners.
     def __init__(self) -> None:
         self._stage_sub: Any = None
         self._notice_listener: Any = None
         self._listeners: list[Any] = []
 
+    # Return the shared manager instance.
     @classmethod
     def get(cls) -> "LayerRegistry | None":
         return cls._instance
 
+    # Install the shared registry and subscribe to stage changes.
     def apply(self) -> None:
         LayerRegistry._instance = self
         self._subscribe_stage_events()
         self._register_notice_listener()
         add_active_context_listener(self._on_active_context_changed)
 
+    # Release context, stage, and object-change subscriptions.
     def destroy(self) -> None:
         remove_active_context_listener(self._on_active_context_changed)
         if self._stage_sub is not None:
@@ -490,6 +534,8 @@ class LayerRegistry:
         self._subscribe_stage_events()
         self._notify_listeners()
 
+    # --- DRAWING PLANES AND STROKES ---
+
     # PATHS OF EVERY DRAWING PLANE PRIM CURRENTLY IN THE STAGE.
     def drawing_planes(self) -> list[str]:
         return self._children_of(DRAWING_PLANES_ROOT)
@@ -499,8 +545,7 @@ class LayerRegistry:
     # `_LiveStrokeCurves`) are internal helpers (shared materials, in-progress
     # live-stroke temp prims) and are excluded from the layers panel.
     def strokes(self) -> list[str]:
-        return [p for p in self._children_of(STROKES_ROOT)
-                if not p.rsplit("/", 1)[-1].startswith("_")]
+        return [p for p in self._children_of(STROKES_ROOT) if not p.rsplit("/", 1)[-1].startswith("_")]
 
     # PATH (OR SENTINEL) OF THE CURRENTLY ACTIVE DRAWING PLANE.
     def active_plane(self) -> str:
@@ -539,12 +584,14 @@ class LayerRegistry:
         if callback not in self._listeners:
             self._listeners.append(callback)
 
+    # Remove a previously registered callback.
     def remove_listener(self, callback: Any) -> None:
         try:
             self._listeners.remove(callback)
         except ValueError:
             pass
 
+    # Notify listeners using a stable callback list.
     def _notify_listeners(self) -> None:
         for cb in list(self._listeners):
             try:
@@ -554,6 +601,7 @@ class LayerRegistry:
 
     # ----- internals -----
 
+    # Return valid children beneath the requested prim.
     def _children_of(self, root_path: str) -> list[str]:
         try:
             stage = get_active_stage()
@@ -566,6 +614,7 @@ class LayerRegistry:
         except Exception:
             return []
 
+    # Listen for changes in the active USD context.
     def _subscribe_stage_events(self) -> None:
         try:
             ctx = get_active_usd_context()
@@ -576,6 +625,7 @@ class LayerRegistry:
         except Exception:
             self._stage_sub = None
 
+    # Refresh the layer list when a stage opens.
     def _on_stage_event(self, event: Any) -> None:
         try:
             if int(event.type) == int(omni.usd.StageEventType.OPENED):
@@ -583,9 +633,11 @@ class LayerRegistry:
         except Exception:
             pass
 
+    # Listen for USD object changes.
     def _register_notice_listener(self) -> None:
         try:
             from pxr import Tf, Usd
+
             self._notice_listener = cast(Any, Tf).Notice.Register(
                 cast(Any, Usd).Notice.ObjectsChanged,
                 self._on_objects_changed,
@@ -594,6 +646,7 @@ class LayerRegistry:
         except Exception:
             self._notice_listener = None
 
+    # Refresh when drawing planes or strokes are added or removed.
     def _on_objects_changed(self, notice: Any, _stage: Any) -> None:
         # Refresh whenever something is added/removed under either root.
         try:
@@ -606,6 +659,11 @@ class LayerRegistry:
                 return
 
 
+# ----------------------------------------------------------------------
+# 5. GROUP REGISTRY
+# ----------------------------------------------------------------------
+
+
 # CENTRAL OWNER OF GROUPS. GROUPS ARE A VIRTUAL CLAYERS-ONLY CONCEPT
 # (USD PATHS ARE NEVER REPARENTED). EACH GROUP HAS A PARENT (ANOTHER GROUP
 # ID OR AN ANCHOR), A NAME, MEMBERS (USD PATHS), AND ITS OWN ACTIVE FLAG
@@ -614,6 +672,7 @@ class LayerRegistry:
 class GroupRegistry:
     _instance: "GroupRegistry | None" = None
 
+    # Track group metadata, listeners, and the selected group.
     def __init__(self) -> None:
         self._stage_sub: Any = None
         # In-memory copy: id -> {name, parent, members(list[str]), active(bool)}.
@@ -622,6 +681,7 @@ class GroupRegistry:
         # Currently CLayers-selected group id (drives the Ungroup button).
         self._selected_group: str | None = None
 
+    # Return the shared manager instance.
     @classmethod
     def get(cls) -> "GroupRegistry | None":
         return cls._instance
@@ -663,6 +723,8 @@ class GroupRegistry:
 
     # ----- public API -----
 
+    # --- GROUP MEMBERSHIP AND PARENT LOOKUPS ---
+
     # ALL GROUP IDS WHOSE parent EQUALS THE GIVEN ANCHOR OR GROUP ID.
     def child_groups_of(self, parent_id: str) -> list[str]:
         return [gid for gid, g in self._groups.items() if g.get("parent") == parent_id]
@@ -687,6 +749,8 @@ class GroupRegistry:
         return str(g.get("parent")) if g else None
 
     # ----- group visibility / lock (mirror prim semantics) -----
+
+    # --- GROUP VISIBILITY, LOCKING, AND ACTIVE STATE ---
 
     # OWN VISIBILITY FLAG OF THIS GROUP (DEFAULT TRUE).
     def is_visible_self(self, group_id: str) -> bool:
@@ -830,9 +894,11 @@ class GroupRegistry:
         if group_id not in self._groups:
             return
         for gid, other in self._groups.items():
-            other["active"] = (gid == group_id)
+            other["active"] = gid == group_id
         self._persist()
         self._notify_listeners()
+
+    # --- GROUP CREATION AND MEMBERSHIP CHANGES ---
 
     # CREATE A NEW GROUP. RETURNS THE NEW ID. THE GROUP IS PLACED UNDER
     # parent_id (ANCHOR OR ANOTHER GROUP). MEMBERS ARE OPTIONALLY SEEDED.
@@ -913,6 +979,7 @@ class GroupRegistry:
     def selected_group(self) -> str | None:
         return self._selected_group
 
+    # Remember the selected group and refresh listeners.
     def set_selected_group(self, group_id: str | None) -> None:
         self._selected_group = group_id
         self._notify_listeners()
@@ -935,6 +1002,7 @@ class GroupRegistry:
         if callback not in self._listeners:
             self._listeners.append(callback)
 
+    # Remove a previously registered callback.
     def remove_listener(self, callback: Any) -> None:
         try:
             self._listeners.remove(callback)
@@ -943,6 +1011,7 @@ class GroupRegistry:
 
     # ----- internals -----
 
+    # Notify listeners using a stable callback list.
     def _notify_listeners(self) -> None:
         for cb in list(self._listeners):
             try:
@@ -965,6 +1034,7 @@ class GroupRegistry:
             last = active_child
             cursor = active_child
 
+    # Remove a prim from its current group.
     def _remove_from_any_group(self, path: str) -> bool:
         for g in self._groups.values():
             members = g.get("members", [])
@@ -973,11 +1043,14 @@ class GroupRegistry:
                 return True
         return False
 
+    # Find the next unused group ID.
     def _allocate_id(self) -> str:
         n = 0
         while f"g{n}" in self._groups:
             n += 1
         return f"g{n}"
+
+    # --- LOAD AND SAVE GROUP METADATA ---
 
     # Deserialise from root-layer customLayerData on apply()/stage open.
     def _load(self) -> None:
@@ -1043,10 +1116,7 @@ class GroupRegistry:
             return
         # Otherwise, find an existing root-level group named Default Drawing
         # (or any root group) and activate it; create one if none exist.
-        root_groups = [
-            gid for gid, g in self._groups.items()
-            if g.get("parent") == GROUP_ANCHOR_ROOT
-        ]
+        root_groups = [gid for gid, g in self._groups.items() if g.get("parent") == GROUP_ANCHOR_ROOT]
         if not root_groups:
             self.create_group(
                 DEFAULT_STROKE_GROUP_NAME,
@@ -1057,6 +1127,7 @@ class GroupRegistry:
             return
         self.set_active(root_groups[0])
 
+    # Listen for changes in the active USD context.
     def _subscribe_stage_events(self) -> None:
         try:
             ctx = get_active_usd_context()
@@ -1067,6 +1138,7 @@ class GroupRegistry:
         except Exception:
             self._stage_sub = None
 
+    # Reload groups and restore the default group when a stage opens.
     def _on_stage_event(self, event: Any) -> None:
         try:
             if int(event.type) == int(omni.usd.StageEventType.OPENED):

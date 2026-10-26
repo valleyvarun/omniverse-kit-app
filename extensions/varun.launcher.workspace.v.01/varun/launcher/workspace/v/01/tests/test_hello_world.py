@@ -13,14 +13,18 @@
 #   suport for async/await tests
 #   For most things refer to unittest docs:
 #   https://docs.python.org/3/library/unittest.html
-import omni.kit.test
-
-# Extension for writing UI tests (to simulate UI interaction)
-import omni.kit.ui_test as ui_test
-
 # Import extension python module we are testing with absolute import path,
 # as if we are external user (other extension)
-import varun.launcher.workspace.v.01
+from importlib import import_module
+
+import omni.kit.test
+
+# Inspect the extension window registered with Kit.
+import omni.ui as ui
+
+# ----------------------------------------------------------------------
+# 1. TEST
+# ----------------------------------------------------------------------
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the
@@ -34,29 +38,12 @@ class Test(omni.kit.test.AsyncTestCase):
     async def tearDown(self):
         pass
 
-    # Actual test, notice it is an "async" function, so "await" can be used if needed
-    async def test_hello_public_function(self):
-        result = varun.launcher.workspace.v.01.some_public_function(4)
-        self.assertEqual(result, 256)
+    # Check the extension entry point exposed to Kit.
+    async def test_extension_entry_point(self):
+        module = import_module("varun.launcher.workspace.v.01")
+        self.assertTrue(callable(module.MyExtension.on_startup))
+        self.assertTrue(callable(module.MyExtension.on_shutdown))
 
-    async def test_window_button(self):
-        # Find a label in our window
-        label = ui_test.find("varun_launcher_workspace//Frame/**/Label[*]")
-
-        # Find buttons in our window
-        add_button = ui_test.find(
-            "varun_launcher_workspace//Frame/**/Button[*].text=='Add'"
-        )
-        reset_button = ui_test.find(
-            "varun_launcher_workspace//Frame/**/Button[*].text=='Reset'"
-        )
-
-        # Click reset button
-        await reset_button.click()
-        self.assertEqual(label.widget.text, "empty")
-
-        await add_button.click()
-        self.assertEqual(label.widget.text, "count: 1")
-
-        await add_button.click()
-        self.assertEqual(label.widget.text, "count: 2")
+    # Check that startup registered the expected window.
+    async def test_extension_window(self):
+        self.assertIsNotNone(ui.Workspace.get_window("tabs_bar_window"))

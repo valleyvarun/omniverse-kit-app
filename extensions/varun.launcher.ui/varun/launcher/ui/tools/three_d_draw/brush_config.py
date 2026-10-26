@@ -6,9 +6,14 @@ notified on any value change (including `active`) so dependent UIs
 (e.g. the properties panel, the cursor scene) can refresh.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 from typing import Callable
+
+# ----------------------------------------------------------------------
+# 1. BRUSH CONFIG
+# ----------------------------------------------------------------------
 
 
 class BrushConfig:
@@ -27,6 +32,7 @@ class BrushConfig:
     # Process-wide singleton so cursor / tool / UI all share the same state.
     _instance: "BrushConfig | None" = None
 
+    # Set brush defaults and prepare change listeners.
     def __init__(self) -> None:
         self.brush_radius: float = self.BRUSH_RADIUS_DEFAULT
         # Whether the 3D Draw tool is currently active; toggled by the tool.
@@ -59,6 +65,7 @@ class BrushConfig:
     def active(self) -> bool:
         return self._active
 
+    # Update brush activation and notify listeners when it changes.
     def set_active(self, value: bool) -> None:
         value = bool(value)
         if self._active != value:
@@ -77,6 +84,7 @@ class BrushConfig:
         if cb not in self._listeners:
             self._listeners.append(cb)
 
+    # Remove a previously registered callback.
     def remove_listener(self, cb: Callable[[], None]) -> None:
         try:
             self._listeners.remove(cb)
@@ -91,6 +99,7 @@ class BrushConfig:
             except Exception:
                 pass
 
+    # Keep brush parameters within their allowed ranges.
     @staticmethod
     def _clamp(value: float, lo: float, hi: float) -> float:
         try:

@@ -1,0 +1,91 @@
+[
+  {
+    "dock_id": 3358485147,
+    "children": [
+      {
+        "dock_id": 17,
+        "position": "LEFT",
+        "children": [
+          {
+            "dock_id": 11,
+            "position": "LEFT",
+            "children": [
+              {
+                "dock_id": 11,
+                "title": "Tool Box",
+                "width": 170,
+                "height": 850,
+                "position_x": 0,
+                "position_y": 36,
+                "visible": true,
+                "selected_in_dock": true,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false
+              }
+            ]
+          },
+          {
+            "dock_id": 12,
+            "position": "RIGHT",
+            "children": [
+              {
+                "dock_id": 12,
+                "title": "Viewport",
+                "width": 1175,
+                "height": 850,
+                "position_x": 170,
+                "position_y": 36,
+                "visible": true,
+                "selected_in_dock": true,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "dock_id": 20,
+        "position": "RIGHT",
+        "children": [
+          {
+            "dock_id": 18,
+            "position": "TOP",
+            "children": [
+              {
+                "dock_id": 18,
+                "title": "Clayers",
+                "width": 255,
+                "height": 425,
+                "position_x": 1345,
+                "position_y": 36,
+                "visible": true,
+                "selected_in_dock": true,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false
+              }
+            ]
+          },
+          {
+            "dock_id": 19,
+            "position": "BOTTOM",
+            "children": [
+              {
+                "dock_id": 19,
+                "title": "Stage",
+                "width": 255,
+                "height": 425,
+                "position_x": 1345,
+                "position_y": 461,
+                "visible": true,
+                "selected_in_dock": true,
+                "dock_tab_bar_enabled": false,
+                "dock_tab_bar_visible": false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -6,24 +6,35 @@ available viewport so the FPS / GPU / memory / resolution overlay shows or
 hides on demand.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 from typing import Any, List, Optional, cast
 
+# Omniverse & USD imports
 import carb.settings
-
 from omni.kit.viewport.menubar.core import ViewportButtonItem
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 _EXT_SETTINGS_ROOT = "/exts/varun.launcher.ui/hud_toggle"
 _VISIBLE_SETTING = f"{_EXT_SETTINGS_ROOT}/visible"
 _ORDER_SETTING = f"{_EXT_SETTINGS_ROOT}/order"
 
 
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
+
+
+# Build the HUD visibility setting for a viewport ID.
 def _viewport_hud_setting(viewport_api_id: str) -> str:
     return f"/persistent/app/viewport/{viewport_api_id}/hud/visible"
 
 
+# Collect viewport IDs from available Kit APIs.
 def _iter_viewport_ids() -> List[str]:
     try:
         from omni.kit.viewport.utility import get_active_viewport_and_window  # type: ignore[reportUnknownVariableType]
@@ -55,9 +66,15 @@ def _iter_viewport_ids() -> List[str]:
     return ids
 
 
+# ----------------------------------------------------------------------
+# 3. HUD TOGGLE BUTTON
+# ----------------------------------------------------------------------
+
+
 class HudToggleButton:
     """Registers a viewport menubar button that toggles the HUD overlay."""
 
+    # Register the HUD button and its menu settings.
     def __init__(self) -> None:
         settings = carb.settings.get_settings()
         settings.set_default(_VISIBLE_SETTING, True)
@@ -73,6 +90,7 @@ class HudToggleButton:
             order_setting_path=_ORDER_SETTING,
         )
 
+    # Apply one HUD visibility choice across all viewports.
     def _on_click(self) -> None:
         settings = carb.settings.get_settings()
         ids = _iter_viewport_ids()
@@ -88,6 +106,7 @@ class HudToggleButton:
         for vp_id in ids:
             settings.set(_viewport_hud_setting(vp_id), new_value)
 
+    # Remove the HUD menubar button.
     def destroy(self) -> None:
         if self._button is not None:
             self._button.destroy()

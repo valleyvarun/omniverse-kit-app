@@ -8,6 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# ----------------------------------------------------------------------
+# 1. PACKAGE DETAILS
+# ----------------------------------------------------------------------
+
 [package]
 title = "Python UI Extension"
 version = "0.1.0"  # Semantic Versioning is used: https://semver.org/
@@ -20,6 +24,10 @@ preview_image = "data/preview.png"  # Preview to show in the Extension Manager
 readme  = "docs/README.md"  # Path (relative to the root) or content of readme markdown file for UI
 repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of the extension source repository
 
+
+# ----------------------------------------------------------------------
+# 2. EXTENSION DEPENDENCIES
+# ----------------------------------------------------------------------
 
 [dependencies]
 "omni.kit.uiapp" = {}
@@ -49,6 +57,10 @@ repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of th
 "omni.usd" = {}
 
 
+# ----------------------------------------------------------------------
+# 3. DEFAULT SETTINGS
+# ----------------------------------------------------------------------
+
 [settings]
 app.content.emptyStageOnStart = false
 app.viewport.autoFrame.mode = "first_open"
@@ -65,9 +77,17 @@ exts."omni.kit.viewport.window".startup.disableWindowOnLoad = true
 exts."omni.kit.viewport.ready".startup.enabled = false
 
 
+# ----------------------------------------------------------------------
+# 4. PYTHON ENTRY POINT
+# ----------------------------------------------------------------------
+
 [[python.module]]  # Main python module this extension provides, it will be publicly available as "import varun.launcher.ui"
 name = "varun.launcher.ui"
 
+
+# ----------------------------------------------------------------------
+# 5. DOCUMENTATION PAGES
+# ----------------------------------------------------------------------
 
 [documentation]
 pages = [
@@ -75,6 +95,10 @@ pages = [
     "docs/CHANGELOG.md",
 ]
 
+
+# ----------------------------------------------------------------------
+# 6. TEST CONFIGURATION
+# ----------------------------------------------------------------------
 
 [[test]]
 dependencies = [

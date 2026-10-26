@@ -9,9 +9,15 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# Python & library imports
 import asyncio
 
+# Omniverse & USD imports
 from omni.kit.test import AsyncTestCase, BenchmarkTestCase
+
+# ----------------------------------------------------------------------
+# 1. TEST BENCHMARKS
+# ----------------------------------------------------------------------
 
 
 class TestBenchmarks(BenchmarkTestCase):
@@ -23,6 +29,7 @@ class TestBenchmarks(BenchmarkTestCase):
       belong to the default metrics which are always reported.
     """
 
+    # Prepare the test fixture.
     def setUp(self):
         pass
 
@@ -44,10 +51,13 @@ class TestBenchmarks(BenchmarkTestCase):
         """
         # array of samples for custom metric 'my_other_metric' is set to
         # [1.2ms, 0.9ms, 1.1ms]
-        self.set_metric_sample_array(
-            name="my_other_metric", values=[1.2, 0.9, 1.1], unit="ms"
-        )
+        self.set_metric_sample_array(name="my_other_metric", values=[1.2, 0.9, 1.1], unit="ms")
         await asyncio.sleep(0.01)
+
+
+# ----------------------------------------------------------------------
+# 2. TEST BENCHMARKS NO CUSTOM METRIC
+# ----------------------------------------------------------------------
 
 
 class TestBenchmarksNoCustomMetric(AsyncTestCase):
@@ -60,8 +70,10 @@ class TestBenchmarksNoCustomMetric(AsyncTestCase):
       belong to the default metrics which are always reported.
     """
 
+    # Prepare the test fixture.
     def setUp(self):
         pass
 
+    # Measure an asynchronous wait without custom metrics.
     async def benchmark_sleepy_no_custom(self):
         await asyncio.sleep(0.1)

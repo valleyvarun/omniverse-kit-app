@@ -5,3 +5,4 @@
 # loads submodules that in turn do `from ..tool import Tool` -- looping
 # back through this still-partially-initialized package. Import directly
 # from submodules instead (e.g. `from .tools.tool import Tool`).
+# Package marker; no runtime setup is required.

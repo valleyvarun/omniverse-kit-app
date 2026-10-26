@@ -1,13 +1,15 @@
+# Omniverse & USD imports
 import omni.ui as ui
 
+# Local imports
 from ..active_context import (
     add_active_context_listener,
     get_active_usd_context,
     remove_active_context_listener,
 )
 from ..startup.styles import AGENT_WINDOW_BACKGROUND_STYLE
-from ..tools.three_d_draw.drawing_plane import DrawingPlane
 from ..tools.three_d_draw.basis_curves import ThreeDDrawCurvesTool
+from ..tools.three_d_draw.drawing_plane import DrawingPlane
 from ..tools.three_d_draw.escape_handler import EscapeHandler
 from ..tools.three_d_draw.three_d_draw import ThreeDDrawTool
 from ..tools.tool import Tool
@@ -18,8 +20,13 @@ from ..tools.transform.transform_tools import (
 )
 from .window import LauncherWindow
 
+# ----------------------------------------------------------------------
+# 1. BOTTOM WINDOW
+# ----------------------------------------------------------------------
+
 
 class BottomWindow(LauncherWindow):
+    # Create drawing tools, transform tools, and their input listeners.
     def __init__(self) -> None:
         # Tool instances kept alive so their callbacks stay valid.
         self._drawing_plane = DrawingPlane()
@@ -102,7 +109,7 @@ class BottomWindow(LauncherWindow):
         except Exception:
             pass
 
-
+    # Build the tool buttons over the toolbar background.
     def _build_ui(self) -> None:
         if not self._window:
             return

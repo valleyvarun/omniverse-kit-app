@@ -9,16 +9,23 @@ classes (e.g. `BrushConfig`, the cursor scene registry) remain in their
 original modules.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Callable
 
+# Omniverse & USD imports
 import omni.ui as ui
 
-from .brush_config import BrushConfig
 from ..tool_properties import ToolPropertiesPanel
 
+# Local imports
+from .brush_config import BrushConfig
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # --- File-system locations --------------------------------------------------
 # Directory holding tool icons (`ui/logos/`). `tool_settings.py` lives at
@@ -83,6 +90,11 @@ INITIAL_STROKE_CAPACITY = 4096
 SAMPLE_MIN_DISTANCE = 0.1
 
 
+# ----------------------------------------------------------------------
+# 2. THREE DDRAW PROPERTIES PANEL
+# ----------------------------------------------------------------------
+
+
 # ============================================================================
 # 3D DRAW PANEL
 # Brush-size slider (with paired value field) that mutates the shared
@@ -90,6 +102,7 @@ SAMPLE_MIN_DISTANCE = 0.1
 # defaults plus the UI that exposes them -- is colocated.
 # ============================================================================
 class ThreeDDrawPropertiesPanel(ToolPropertiesPanel):
+    # Track brush settings, widget models, and their listeners.
     def __init__(self, request_refresh: Callable[[], None]) -> None:
         super().__init__(request_refresh)
         # Subscribe to BrushConfig change notifications so the panel can
@@ -167,13 +180,10 @@ class ThreeDDrawPropertiesPanel(ToolPropertiesPanel):
             field = ui.FloatField(width=50)
             field.model.set_value(float(value))
             # Slider takes the remaining space; transparent text via style.
-            slider = ui.FloatSlider(field.model, min=lo, max=hi, step=step,
-                                    style={"color": 0x00000000})
+            slider = ui.FloatSlider(field.model, min=lo, max=hi, step=step, style={"color": 0x00000000})
             # Subscribe once on the shared model; both widgets fire it.
             sub = field.model.subscribe_value_changed_fn(
-                lambda m, cb=on_changed: self._on_slider_changed(
-                    cb, m.get_value_as_float()
-                )
+                lambda m, cb=on_changed: self._on_slider_changed(cb, m.get_value_as_float())
             )
             self._field_subs.append(sub)
             # `slider` is parented by the HStack; del just silences linters.
@@ -193,12 +203,9 @@ class ThreeDDrawPropertiesPanel(ToolPropertiesPanel):
             ui.Label(label, width=80)
             field = ui.IntField(width=50)
             field.model.set_value(int(value))
-            slider = ui.IntSlider(field.model, min=lo, max=hi,
-                                  style={"color": 0x00000000})
+            slider = ui.IntSlider(field.model, min=lo, max=hi, style={"color": 0x00000000})
             sub = field.model.subscribe_value_changed_fn(
-                lambda m, cb=on_changed: self._on_slider_changed(
-                    cb, m.get_value_as_int()
-                )
+                lambda m, cb=on_changed: self._on_slider_changed(cb, m.get_value_as_int())
             )
             self._field_subs.append(sub)
             del slider

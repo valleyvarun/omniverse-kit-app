@@ -1,6 +1,12 @@
+# Python & library imports
 from typing import Any
 
+# Omniverse & USD imports
 import omni.ui as ui
+
+# ----------------------------------------------------------------------
+# 1. LAUNCHER WINDOW
+# ----------------------------------------------------------------------
 
 
 class LauncherWindow:

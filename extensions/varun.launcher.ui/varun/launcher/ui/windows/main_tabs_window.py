@@ -1,18 +1,20 @@
 """Custom 'fake' tab bar shown above the main dock slot."""
 
-from typing import Any, Callable, cast
-
+# Python & library imports
 import asyncio
 from pathlib import Path
+from typing import Any, Callable, cast
 
+# Omniverse & USD imports
 import omni.kit.app
 import omni.ui as ui
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Close (X) icon path; bundled with the extension logos.
-_CLOSE_ICON = str(
-    (Path(__file__).resolve().parent.parent / "logos" / "close.svg")
-)
+_CLOSE_ICON = str((Path(__file__).resolve().parent.parent / "logos" / "close.svg"))
 
 
 # Tab geometry -- matched to Kit's native dock-tab bar.
@@ -140,6 +142,11 @@ _X_BUTTON_STYLE_VISIBLE: dict[str, dict[str, Any]] = {
     },
 }
 
+# ----------------------------------------------------------------------
+# 2. MAIN TABS WINDOW
+# ----------------------------------------------------------------------
+
+
 class MainTabsWindow:
     """Docked window that draws the fake tab strip.
 
@@ -147,6 +154,7 @@ class MainTabsWindow:
     fires when the X overlay on a closable tab is clicked.
     """
 
+    # Create the tab-strip window and track tab callbacks and styles.
     def __init__(
         self,
         on_tab_clicked: Callable[[str], None],
@@ -159,11 +167,7 @@ class MainTabsWindow:
         self._active: str | None = None
 
         # No chrome -- the window is just a row of buttons; docking stays enabled.
-        flags = (
-            ui.WINDOW_FLAGS_NO_TITLE_BAR
-            | ui.WINDOW_FLAGS_NO_SCROLLBAR
-            | ui.WINDOW_FLAGS_NO_RESIZE
-        )
+        flags = ui.WINDOW_FLAGS_NO_TITLE_BAR | ui.WINDOW_FLAGS_NO_SCROLLBAR | ui.WINDOW_FLAGS_NO_RESIZE
         self._window: ui.Window | None = ui.Window(
             "Main Tabs",
             height=_TAB_HEIGHT,
@@ -171,6 +175,7 @@ class MainTabsWindow:
             padding_x=0,
             padding_y=0,
         )
+        assert self._window is not None
         # Hide Kit's own dock-tab bar on this window's dock node.
         try:
             cast(Any, self._window).dock_tab_bar_visible = False
@@ -201,6 +206,9 @@ class MainTabsWindow:
         # Force the dock-node height on every frame so hot-reload picks up changes.
         asyncio.ensure_future(self._enforce_dock_height())
 
+    # --- DOCK HEIGHT MAINTENANCE ---
+
+    # Keep the docked tab strip at its configured height.
     async def _enforce_dock_height(self) -> None:
         app = cast(Any, omni.kit.app.get_app())
         while self._window is not None:
@@ -269,6 +277,7 @@ class MainTabsWindow:
 
     # LIFECYCLE -----------------------------------------------------------
 
+    # Destroy the tab strip and clear its tab data.
     def destroy(self) -> None:
         if self._window is not None:
             try:
@@ -282,6 +291,7 @@ class MainTabsWindow:
 
     # INTERNAL ------------------------------------------------------------
 
+    # Rebuild the tab strip if its window still exists.
     def _refresh(self) -> None:
         if self._window is None:
             return
@@ -290,26 +300,24 @@ class MainTabsWindow:
         except Exception:
             pass
 
+    # Draw the tab strip background and tab buttons.
     def _build_contents(self) -> None:
         # All containers pinned to _TAB_HEIGHT so font metrics don't grow the dock node.
         with ui.ZStack(height=_TAB_HEIGHT):
-            ui.Rectangle(
-                style={"background_color": _COLOR_BAR_BG, "border_width": 0}
-            )
+            ui.Rectangle(style={"background_color": _COLOR_BAR_BG, "border_width": 0})
             with ui.HStack(spacing=1, height=_TAB_HEIGHT):
                 for name in self._tab_names:
                     self._build_tab(name)
                 ui.Spacer()
 
+    # --- TAB BUTTON AND CLOSE OVERLAY ---
+
+    # Build the tab button, close overlay, and hover behavior.
     def _build_tab(self, name: str) -> None:
         is_active = name == self._active
         closable = self._closable.get(name, True)
         if closable:
-            style = (
-                _TAB_BUTTON_ACTIVE_STYLE_CLOSABLE
-                if is_active
-                else _TAB_BUTTON_STYLE_CLOSABLE
-            )
+            style = _TAB_BUTTON_ACTIVE_STYLE_CLOSABLE if is_active else _TAB_BUTTON_STYLE_CLOSABLE
         else:
             style = _TAB_BUTTON_ACTIVE_STYLE if is_active else _TAB_BUTTON_STYLE
 
@@ -328,12 +336,7 @@ class MainTabsWindow:
         # Closable: LEFT-aligned label (with leading-space padding) + X overlay on the right.
         display_name = (" " * _TAB_LABEL_LEFT_PAD_CHARS) + name
         label_width = len(display_name) * _TAB_CHAR_WIDTH
-        width = (
-            label_width
-            + _X_LABEL_GAP
-            + _X_BUTTON_SIZE
-            + _X_RIGHT_MARGIN
-        )
+        width = label_width + _X_LABEL_GAP + _X_BUTTON_SIZE + _X_RIGHT_MARGIN
         width = max(70, width)
 
         with ui.ZStack(width=width, height=_TAB_HEIGHT):
@@ -364,6 +367,7 @@ class MainTabsWindow:
                         height=_X_BUTTON_SIZE,
                         style=_X_BUTTON_STYLE_HIDDEN,
                     )
+
                     # Use mouse-press (fires on down) instead of clicked_fn
                     # (fires on release) so the close runs BEFORE the tab
                     # button beneath fires its own click-on-release, which
@@ -371,6 +375,7 @@ class MainTabsWindow:
                     def _on_x_press(x: float, y: float, btn: int, mod: int, n: str = name) -> None:
                         if btn == 0:
                             self._handle_close(n)
+
                     try:
                         cast(Any, x_btn).set_mouse_pressed_fn(_on_x_press)
                     except Exception:
@@ -383,9 +388,7 @@ class MainTabsWindow:
         def _update(_x: ui.Button = x_btn) -> None:
             try:
                 cast(Any, _x).set_style(
-                    _X_BUTTON_STYLE_VISIBLE
-                    if (hover["tab"] or hover["x"])
-                    else _X_BUTTON_STYLE_HIDDEN
+                    _X_BUTTON_STYLE_VISIBLE if (hover["tab"] or hover["x"]) else _X_BUTTON_STYLE_HIDDEN
                 )
             except Exception:
                 pass
@@ -407,12 +410,16 @@ class MainTabsWindow:
         except Exception:
             pass
 
+    # --- CLICK CALLBACKS ---
+
+    # Forward the selected tab name to the main window.
     def _handle_click(self, name: str) -> None:
         try:
             self._on_tab_clicked(name)
         except Exception:
             pass
 
+    # Forward the close request to the owning window.
     def _handle_close(self, name: str) -> None:
         if self._on_tab_close is None:
             return

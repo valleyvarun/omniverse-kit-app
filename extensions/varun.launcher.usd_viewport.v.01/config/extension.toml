@@ -8,55 +8,127 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# ----------------------------------------------------------------------
+# 1. PACKAGE DETAILS
+# ----------------------------------------------------------------------
+
 [package]
 title = "usd viewport"
-version = "01"  # Semantic Versioning is used: https://semver.org/
-description = "The simplest python UI extension example. Use it as a starting point for your extensions."
-category = "Example"  # How to categorize this in the Extension Manager
+version = "01"
+description = "Lightweight solid USD viewport with Dark and Grey Studio appearances and optional RTX rendering."
+category = "Viewport"
 changelog = "docs/CHANGELOG.md"
-icon = "data/icon.png"  # Icon to show in the Extension Manager
-keywords = ["kit", "example", "extension", "python", "ui"]  # Search keywords for the Extension Manager
-preview_image = "data/preview.png"  # Preview to show in the Extension Manager
-readme  = "docs/README.md"  # Path (relative to the root) or content of readme markdown file for UI
-repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of the extension source repository
+icon = "data/icon.png"
+keywords = ["kit", "example", "extension", "python", "ui"]
+preview_image = "data/preview.png"
+readme  = "docs/README.md"
+repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"
 
+
+# ----------------------------------------------------------------------
+# 2. STARTUP & RELOAD POLICY
+# ----------------------------------------------------------------------
+
+[core]
+# The native controller and GPU policy require a full application restart.
+reloadable = false
+
+# ----------------------------------------------------------------------
+# 3. FILE WATCHER EXCLUSIONS
+# ----------------------------------------------------------------------
+
+[fswatcher]
+paths.exclude = ["*/_build", "*/bin", "*/__pycache__"]
+
+# ----------------------------------------------------------------------
+# 4. EXTENSION DEPENDENCIES
+# ----------------------------------------------------------------------
 
 [dependencies]
 "omni.kit.uiapp" = {}
 "omni.activity.profiler" = {}
 "omni.activity.pump" = {}
-"omni.hydra.rtx" = {}
+# GPU policy loads RTX explicitly; even optional dependencies enter Kit's solver.
+"omni.hydra.pxr" = {}
 "omni.kit.renderer.core" = {}
 "omni.kit.stage_templates" = {}
+"omni.kit.commands" = {}
 "omni.kit.viewport.bundle" = {}
+"omni.kit.viewport.menubar.core" = {}
 "omni.kit.viewport.menubar.framerate" = {}
 "omni.kit.viewport.menubar.lighting" = {}
+"omni.kit.viewport.menubar.render" = {}
 "omni.kit.viewport.ready" = {}
-"omni.kit.viewport.rtx" = {}
 "omni.kit.viewport.scene_camera_model" = {}
 "omni.kit.viewport.window" = {}
 "omni.usd" = {}
+"omni.ui.scene" = {}
 
+
+# ----------------------------------------------------------------------
+# 5. DEFAULT SETTINGS
+# ----------------------------------------------------------------------
 
 [settings]
 app.content.emptyStageOnStart = false
 app.viewport.autoFrame.mode = "first_open"
 app.viewport.defaults.fillViewport = true
-app.renderer.active = "rtx"
-app.renderer.enabled = "rtx"
-renderer.active = "rtx"
-renderer.enabled = "rtx"
+app.viewport.defaults.hud.visible = false
+renderer.active = "pxr"
+renderer.enabled = "pxr,rtx"
+pxr.rendermode = "HdStormRendererPlugin"
+# Set before renderer startup; the compatibility launcher supplies these values
+# on the command line so apps with their own defaults also use the raster path.
+exts."omni.kit.renderer.core".compatibilityMode = false
+"filter:setting".exts."omni.kit.renderer.core".compatibilityMode."value:true".renderer.enabled = "pxr"
+# PXR's GL interop requires a single GPU. These defaults do not disable RTX.
+renderer.multiGpu.enabled = false
+renderer.multiGpu.autoEnable = false
+renderer.multiGpu.maxGpuCount = 1
+app.asyncRendering = false
+app.useFabricSceneDelegate = false
+persistent.exts."varun.launcher.usd_viewport.v.01".viewportLight.theme = "light"
 exts."omni.kit.viewport.window".startup.disableWindowOnLoad = true
 exts."omni.kit.viewport.window".startup.windowName = "Viewport"
 exts."omni.kit.viewport.ready".startup.enabled = true
 exts."omni.kit.viewport.ready".startup.viewport = "Viewport"
+exts."omni.kit.viewport.ready".message = "Viewport Loading"
 exts."omni.kit.viewport.ready".activity_progress.enabled = true
 exts."omni.rtx.window.settings".startup.autoCreateWindow = false
+exts."omni.kit.viewport.menubar.lighting".defaultRig = "Grey Studio"
+# Kit's autoLightRig handler reverts manually applied rigs; we apply the rig ourselves on stage open.
+persistent.exts."omni.kit.viewport.menubar.lighting".autoLightRig.enabled = false
+rtx.rendermode = "RaytracedLighting"
+rtx.indirectDiffuse.enabled = false
+rtx.shadows.enabled = false
+rtx.reflections.enabled = false
+rtx.ambientOcclusion.enabled = false
+rtx-defaults.rendermode = "RaytracedLighting"
+rtx-defaults.indirectDiffuse.enabled = false
+rtx-defaults.shadows.enabled = false
+rtx-defaults.reflections.enabled = false
+rtx-defaults.ambientOcclusion.enabled = false
+persistent.rtx.modes.rt.enabled = true
 
 
-[[python.module]]  # Main python module this extension provides, it will be publicly available as "import varun.launcher.usd_viewport.v.01"
+# ----------------------------------------------------------------------
+# 6. PYTHON ENTRY POINT
+# ----------------------------------------------------------------------
+
+[[python.module]]
 name = "varun.launcher.usd_viewport.v.01"
 
+# ----------------------------------------------------------------------
+# 7. NATIVE PLUGIN
+# ----------------------------------------------------------------------
+
+[[native.plugin]]
+path = "varun/launcher/usd_viewport/v/01/viewport_light/bin/${platform}/*.plugin"
+
+
+# ----------------------------------------------------------------------
+# 8. DOCUMENTATION PAGES
+# ----------------------------------------------------------------------
 
 [documentation]
 pages = [
@@ -65,10 +137,14 @@ pages = [
 ]
 
 
+# ----------------------------------------------------------------------
+# 9. TEST CONFIGURATION
+# ----------------------------------------------------------------------
+
 [[test]]
 dependencies = [
     "omni.kit.test",
-    "omni.kit.ui_test"  # UI testing extension
+    "omni.kit.ui_test"
 ]
 
 args = [

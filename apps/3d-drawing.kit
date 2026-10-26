@@ -1,0 +1,81 @@
+[package]
+title = "3d-drawing"
+version = "0.1.0"
+description = "A minimal Viewport Light workspace for testing 3D drawing tools."
+keywords = ["app"]
+
+[dependencies]
+"varun.launcher.gpu" = {}
+"omni.kit.uiapp" = {}
+"omni.kit.mainwindow" = {}
+"omni.kit.menu.file" = {}
+"omni.kit.menu.edit" = {}
+"varun.drawing.layout.v.01" = {}
+"varun.launcher.usd_viewport.v.01" = {}
+"varun.launcher.tool_box.v.01" = {}
+"varun.launcher.clayers.v.01" = {}
+"omni.kit.window.stage" = {}
+
+[settings]
+# Load bundled extensions and scripts without online registry or user-folder discovery.
+app.extensions.registryEnabled = false
+app.extensions.excluded = ["omni.hydra.rtx", "omni.kit.viewport.rtx"]
+app.extensions.pathProtocolExtensions = []
+app.python.scriptFolders = ["${kit}/scripts"]
+app.omniverse.defaultServer = ""
+app.omniverse.autoLoginOnStart = false
+app.omniverse.showLoginOnStart = false
+# Keep diagnostics local; this drawing app does not submit telemetry or crash reports.
+structuredLog.enable = false
+telemetry.enableAnonymousData = false
+telemetry.enableNVDF = false
+telemetry.enableSentry = false
+telemetry.useOpenEndpoint = false
+crashreporter.enabled = false
+crashreporter.skipOldDumpUpload = true
+# Resolve optional RTX dependencies out before graphics initialization.
+exts."omni.kit.renderer.core".compatibilityMode = true
+exts."omni.kit.renderer.core".raytracingEnabled = false
+# Kit's generic startup notifier incorrectly announces "RTX ready" for Storm.
+exts."omni.kit.viewport.ready".startup.enabled = false
+renderer.enabled = "pxr"
+renderer.active = "pxr"
+pxr.rendermode = "HdStormRendererPlugin"
+app.vulkan = true
+app.useFabricSceneDelegate = false
+app.launcher.autoGpu = true
+app.launcher.forceLightViewport = true
+app.launcher.layout.left_window = "Tool Box"
+exts."varun.launcher.clayers.v.01".showUsdLayers = false
+app.window.title = "3d-drawing"
+app.window.width = 1600
+app.window.height = 900
+app.font.file = "${fonts}/OpenSans-SemiBold.ttf"
+app.font.size = 18
+app.content.emptyStageOnStart = false
+persistent.exts."omni.kit.viewport.menubar.lighting".autoLightRig.enabled = false
+
+[template]
+type = "ApplicationTemplate"
+
+
+########################################################################################################################
+# BEGIN GENERATED PART (Remove from 'BEGIN' to 'END' to regenerate)
+########################################################################################################################
+
+# Kit SDK Version: 109.0.3+production.263267.62477c11.gl
+
+# Version lock for all dependencies:
+[settings.app.exts]
+enabled = [
+	"omni.kit.viewport.menubar.framerate-1.0.10",
+	"omni.kit.viewport.menubar.lighting-107.3.2",
+]
+
+########################################################################################################################
+# END GENERATED PART
+########################################################################################################################
+
+# Local extension search paths (same settings.app.exts table as the version locks).
+foldersCore = ["${kit}/apps", "${kit}/exts", "${kit}/extscore"]
+folders.'++' = ["${app}/../exts", "${app}/../extscache/"]

@@ -11,11 +11,16 @@ Concrete popups (e.g. `apps_window.AppsWindow`) subclass `PopupWindow`
 and only implement `_build_body()` plus any extra entries / callbacks.
 """
 
+# Python & library imports
 from pathlib import Path
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.ui as ui
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Resolve to <python_package>/logos/<name>.png (same folder Home uses).
 # Exposed so subclasses can build full icon paths without duplicating the
@@ -59,6 +64,11 @@ LABEL_STYLE = {
 }
 
 
+# ----------------------------------------------------------------------
+# 2. POPUP WINDOW
+# ----------------------------------------------------------------------
+
+
 class PopupWindow:
     """Floating popup window centered over the main panel.
 
@@ -71,6 +81,7 @@ class PopupWindow:
     WINDOW_WIDTH: int = DEFAULT_WINDOW_WIDTH
     WINDOW_HEIGHT: int = DEFAULT_WINDOW_HEIGHT
 
+    # Keep a handle for the lazily created popup.
     def __init__(self) -> None:
         self._window: ui.Window | None = None
 
@@ -83,16 +94,14 @@ class PopupWindow:
                 self.TITLE,
                 width=self.WINDOW_WIDTH,
                 height=self.WINDOW_HEIGHT,
-                flags=(
-                    ui.WINDOW_FLAGS_NO_DOCKING
-                    | ui.WINDOW_FLAGS_NO_COLLAPSE
-                    | ui.WINDOW_FLAGS_NO_SCROLLBAR
-                ),
+                flags=(ui.WINDOW_FLAGS_NO_DOCKING | ui.WINDOW_FLAGS_NO_COLLAPSE | ui.WINDOW_FLAGS_NO_SCROLLBAR),
             )
+            assert self._window is not None
             with self._window.frame:
                 self._build_body()
         # Force-center every time it's reopened so the user always sees it
         # in the middle even if they dragged it before closing.
+        assert self._window is not None
         self._center_on_main_panel()
         self._window.visible = True
         # Bring to front in case it was already open but hidden behind
@@ -102,10 +111,12 @@ class PopupWindow:
         except Exception:
             pass
 
+    # Hide the popup while keeping its widgets available.
     def hide(self) -> None:
         if self._window is not None:
             self._window.visible = False
 
+    # Destroy the popup and release its handle.
     def destroy(self) -> None:
         if self._window is not None:
             self._window.destroy()

@@ -8,9 +8,15 @@ docks it once via ``deferred_dock_in``, so all that remains here is the
 behind Home).
 """
 
+# Python & library imports
 from typing import Any, cast
 
+# Omniverse & USD imports
 from omni.kit.viewport.window import ViewportWindow
+
+# ----------------------------------------------------------------------
+# 1. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def set_updates_enabled(vp: ViewportWindow, enabled: bool) -> None:

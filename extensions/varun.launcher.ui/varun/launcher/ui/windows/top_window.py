@@ -1,12 +1,24 @@
-﻿from typing import Any, cast
+# Python & library imports
+from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.ui as ui
 
-from ..startup.styles import AGENT_INPUT_FIELD_STYLE, MAIN_WINDOW_BACKGROUND_STYLE, TOP_INPUT_CONTAINER_STYLE
+# Local imports
+from ..startup.styles import (
+    AGENT_INPUT_FIELD_STYLE,
+    MAIN_WINDOW_BACKGROUND_STYLE,
+    TOP_INPUT_CONTAINER_STYLE,
+)
 from .window import LauncherWindow
+
+# ----------------------------------------------------------------------
+# 1. TOP WINDOW
+# ----------------------------------------------------------------------
 
 
 class TopWindow(LauncherWindow):
+    # Create the command model and top window.
     def __init__(self) -> None:
         self._editor_model = ui.SimpleStringModel("")
         self._command_field: ui.StringField | None = None
@@ -15,6 +27,7 @@ class TopWindow(LauncherWindow):
             height=70,
         )
 
+    # Build the command entry area and surrounding controls.
     def _build_ui(self) -> None:
         if not self._window:
             return

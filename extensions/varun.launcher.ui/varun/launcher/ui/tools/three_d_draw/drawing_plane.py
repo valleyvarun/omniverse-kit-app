@@ -1,17 +1,29 @@
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.kit.app
 from omni.ui import scene as sc
 from pxr import Gf, Sdf, UsdGeom, UsdShade, Vt
 
-from ..tool import Tool
 from ...active_context import get_active_stage
 
+# Local imports
+from ..tool import Tool
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
+
+
+# ----------------------------------------------------------------------
+# 2. PLANE REGISTRY
+# ----------------------------------------------------------------------
 
 
 # In-memory record of every drawing plane's equation. The cursor and the 3D
@@ -28,14 +40,17 @@ LOGGER = logging.getLogger(__name__)
 class PlaneRegistry:
     _planes: "dict[str, tuple[Gf.Vec3d, Gf.Vec3d]]" = {}
 
+    # Cache the plane's initial origin and normal.
     @classmethod
     def register(cls, path: str, origin: "Gf.Vec3d", normal: "Gf.Vec3d") -> None:
         cls._planes[path] = (Gf.Vec3d(origin), Gf.Vec3d(normal))
 
+    # Remove a plane from the geometry cache.
     @classmethod
     def unregister(cls, path: str) -> None:
         cls._planes.pop(path, None)
 
+    # Return a plane's cached geometry if registered.
     @classmethod
     def info(cls, path: str) -> "tuple[Gf.Vec3d, Gf.Vec3d] | None":
         return cls._planes.get(path)
@@ -63,15 +78,21 @@ class PlaneRegistry:
         return cls._planes.get(path)
 
 
+# ----------------------------------------------------------------------
+# 3. DRAWING PLANE
+# ----------------------------------------------------------------------
+
+
 # Encapsulates the "Drawing Plane" tool behaviour.
 class DrawingPlane:
-    LABEL = "DP"             # Icon text shown on the toolbar button.
+    LABEL = "DP"  # Icon text shown on the toolbar button.
     NAME = "Drawing Plane"
     BASE_PATH = "/World/DrawingPlanes/DrawingPlane"
-    SIZE = 100.0             # Half-extent of the square plane in stage units.
+    SIZE = 100.0  # Half-extent of the square plane in stage units.
     COLOR = (0.6, 0.2, 0.9)  # Purple.
-    OPACITY = 0.5            # 50% see-through.
+    OPACITY = 0.5  # 50% see-through.
 
+    # Start numbering newly created drawing planes.
     def __init__(self) -> None:
         self._counter = 0
 
@@ -83,6 +104,8 @@ class DrawingPlane:
             tooltip="Create a purple drawing plane in the current stage.",
             on_click=self.create,
         )
+
+    # --- DRAWING PLANE CREATION ---
 
     # Spawn one purple semi-transparent plane in the active stage.
     def create(self) -> None:
@@ -104,9 +127,7 @@ class DrawingPlane:
         )
         mesh.CreateFaceVertexCountsAttr([4])
         mesh.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
-        mesh.CreateExtentAttr(
-            Vt.Vec3fArray([Gf.Vec3f(-size, 0.0, -size), Gf.Vec3f(size, 0.0, size)])
-        )
+        mesh.CreateExtentAttr(Vt.Vec3fArray([Gf.Vec3f(-size, 0.0, -size), Gf.Vec3f(size, 0.0, size)]))
         # Display color is a fallback for the Storm/Hydra display; RTX uses the bound material.
         mesh.CreateDisplayColorAttr([Gf.Vec3f(*self.COLOR)])
         mesh.CreateDisplayOpacityAttr([self.OPACITY])
@@ -118,6 +139,7 @@ class DrawingPlane:
         # Place the new plane into the active group, if any.
         try:
             from ...layers.layers import GroupRegistry
+
             groups = GroupRegistry.get()
             if groups is not None:
                 groups.assign_new_stroke(prim_path)
@@ -190,6 +212,10 @@ class DrawingPlane:
 # small mesh follows the camera and looks larger than it is.
 # ----------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------
+# 4. SHARED STATE & EXPORTS
+# ----------------------------------------------------------------------
+
 _GRID_FACTORY_ID = "varun.launcher.ui.plane_grid"
 
 # CELL is world-units between adjacent grid lines. HALF is the lattice
@@ -202,6 +228,11 @@ _GRID_THICKNESS = 1.0
 
 # Every live _PlaneGridScene instance (one per viewport).
 _grid_scenes: "set[_PlaneGridScene]" = set()
+
+
+# ----------------------------------------------------------------------
+# 5. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 # Build an orthonormal in-plane basis (right, up) given a unit normal.
@@ -224,12 +255,18 @@ def _basis_for_normal(normal: "Gf.Vec3d") -> "tuple[Gf.Vec3d, Gf.Vec3d]":
     return (right, up)
 
 
+# ----------------------------------------------------------------------
+# 6. PLANE GRID SCENE
+# ----------------------------------------------------------------------
+
+
 # Per-viewport scene that draws the active drawing plane's grid. The grid
 # is a fixed lattice of sc.Line segments in local XY; a single
 # sc.Transform carries (a) the rotation that aligns local XY to the
 # active plane's (right, up) basis and (b) a translation that snaps the
 # grid to the nearest cell under the camera's projection onto the plane.
 class _PlaneGridScene:
+    # Create grid transforms and track the viewport and active plane.
     def __init__(self, desc: "dict[str, Any]") -> None:
         self._viewport_api: Any = desc.get("viewport_api")
         self._origin: Gf.Vec3d = Gf.Vec3d(0.0, 0.0, 0.0)
@@ -253,40 +290,48 @@ class _PlaneGridScene:
         _grid_scenes.add(self)
         self.refresh_active_plane()
 
+    # Release this grid scene and its transforms.
     def destroy(self) -> None:
         _grid_scenes.discard(self)
         self._root = None
         self._xform = None
 
+    # Register this scene as a viewport manipulator.
     @property
     def categories(self) -> tuple[str, ...]:
         return ("manipulator",)
 
+    # Return the scene registration name.
     @property
     def name(self) -> str:
         return "DrawingPlaneGrid"
 
+    # Read or update scene visibility.
     @property
     def visible(self) -> bool:
         return self._visible
 
+    # Read or update scene visibility.
     @visible.setter
     def visible(self, value: bool) -> None:
         self._visible = bool(value)
         self._set_visible(self._visible and self._has_active_plane)
 
+    # --- GRID GEOMETRY AND ACTIVE PLANE ---
+
+    # Draw evenly spaced lines in the local grid plane.
     def _build_lines(self) -> None:
         n = int(_GRID_HALF / _GRID_CELL)
         extent = n * _GRID_CELL
         for i in range(-n, n + 1):
             v = i * _GRID_CELL
-            sc.Line([-extent, v, 0.0], [extent, v, 0.0],
-                    color=_GRID_COLOR, thickness=_GRID_THICKNESS)
-            sc.Line([v, -extent, 0.0], [v, extent, 0.0],
-                    color=_GRID_COLOR, thickness=_GRID_THICKNESS)
+            sc.Line([-extent, v, 0.0], [extent, v, 0.0], color=_GRID_COLOR, thickness=_GRID_THICKNESS)
+            sc.Line([v, -extent, 0.0], [v, extent, 0.0], color=_GRID_COLOR, thickness=_GRID_THICKNESS)
 
+    # Resolve the selected plane's current position and orientation.
     def refresh_active_plane(self) -> None:
         from ...layers.layers import DEFAULT_GROUND_PLANE_PATH, LayerRegistry
+
         registry = LayerRegistry.get()
         path = registry.active_plane() if registry is not None else DEFAULT_GROUND_PLANE_PATH
         if path == DEFAULT_GROUND_PLANE_PATH:
@@ -314,6 +359,7 @@ class _PlaneGridScene:
         self._set_visible(True)
         self._update_transform()
 
+    # Apply visibility to the scene root.
     def _set_visible(self, value: bool) -> None:
         if self._root is None:
             return
@@ -322,6 +368,7 @@ class _PlaneGridScene:
         except Exception:
             pass
 
+    # Refresh the active plane and grid transform each frame.
     def tick(self) -> None:
         if self._xform is None:
             return
@@ -330,6 +377,7 @@ class _PlaneGridScene:
         # info_for_path() already pulls a fresh world xform every call.
         self.refresh_active_plane()
 
+    # Read the camera position in world coordinates.
     def _camera_world_pos(self) -> "Gf.Vec3d | None":
         if self._viewport_api is None:
             return None
@@ -341,6 +389,9 @@ class _PlaneGridScene:
         except Exception:
             return None
 
+    # --- CAMERA-RELATIVE GRID PLACEMENT ---
+
+    # Keep the plane grid aligned and centered near the camera.
     def _update_transform(self) -> None:
         cam = self._camera_world_pos()
         rv: Any = self._basis_r
@@ -371,13 +422,30 @@ class _PlaneGridScene:
             tx, ty, tz = float(ov[0]), float(ov[1]), float(ov[2])
         try:
             self._xform.transform = [
-                float(rv[0]), float(rv[1]), float(rv[2]), 0.0,
-                float(uv[0]), float(uv[1]), float(uv[2]), 0.0,
-                float(nv[0]), float(nv[1]), float(nv[2]), 0.0,
-                tx, ty, tz, 1.0,
+                float(rv[0]),
+                float(rv[1]),
+                float(rv[2]),
+                0.0,
+                float(uv[0]),
+                float(uv[1]),
+                float(uv[2]),
+                0.0,
+                float(nv[0]),
+                float(nv[1]),
+                float(nv[2]),
+                0.0,
+                tx,
+                ty,
+                tz,
+                1.0,
             ]
         except Exception:
             pass
+
+
+# ----------------------------------------------------------------------
+# 7. PLANE GRID MANAGER
+# ----------------------------------------------------------------------
 
 
 # Lifecycle owner: registers _PlaneGridScene with the viewport registry,
@@ -386,20 +454,24 @@ class _PlaneGridScene:
 class PlaneGridManager:
     _instance: "PlaneGridManager | None" = None
 
+    # Track grid registration and update subscriptions.
     def __init__(self) -> None:
         self._registration: Any = None
         self._layer_listener_cb: Any = None
         self._update_sub: Any = None
 
+    # Register the grid scene and listen for plane and frame changes.
     def apply(self) -> None:
         try:
             from omni.kit.viewport.registry import RegisterScene
+
             self._registration = cast(Any, RegisterScene)(_PlaneGridScene, _GRID_FACTORY_ID)
         except Exception:
             LOGGER.exception("PlaneGridManager: failed to register viewport scene")
             return
 
         from ...layers.layers import LayerRegistry
+
         self._layer_listener_cb = self._on_layer_change
         registry = LayerRegistry.get()
         if registry is not None:
@@ -409,14 +481,13 @@ class PlaneGridManager:
             app: Any = cast(Any, omni.kit.app.get_app())
             stream: Any = getattr(app, "get_update_event_stream")()
             sub_fn: Any = getattr(stream, "create_subscription_to_pop")
-            self._update_sub = sub_fn(
-                self._on_update, name="varun.launcher.ui.plane_grid.tick"
-            )
+            self._update_sub = sub_fn(self._on_update, name="varun.launcher.ui.plane_grid.tick")
         except Exception:
             LOGGER.exception("PlaneGridManager: failed to subscribe to update stream")
 
         PlaneGridManager._instance = self
 
+    # Release grid scenes, registration, and subscriptions.
     def destroy(self) -> None:
         if self._update_sub is not None:
             try:
@@ -426,6 +497,7 @@ class PlaneGridManager:
             self._update_sub = None
         if self._layer_listener_cb is not None:
             from ...layers.layers import LayerRegistry
+
             registry = LayerRegistry.get()
             if registry is not None:
                 try:
@@ -442,6 +514,7 @@ class PlaneGridManager:
         if PlaneGridManager._instance is self:
             PlaneGridManager._instance = None
 
+    # Refresh all grids after the active drawing plane changes.
     def _on_layer_change(self) -> None:
         for s in list(_grid_scenes):
             try:
@@ -449,6 +522,7 @@ class PlaneGridManager:
             except Exception:
                 pass
 
+    # Update each live grid scene for the current frame.
     def _on_update(self, _evt: Any) -> None:
         for s in list(_grid_scenes):
             try:

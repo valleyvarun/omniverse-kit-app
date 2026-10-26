@@ -8,6 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# ----------------------------------------------------------------------
+# 1. PACKAGE DETAILS
+# ----------------------------------------------------------------------
+
 [package]
 title = "My USD Composer Setup Extension"
 version = "0.1.0"  # Semantic Versioning is used: https://semver.org/
@@ -20,6 +24,10 @@ preview_image = "data/preview.png"  # Preview to show in the Extension Manager
 readme  = "docs/README.md"  # Path (relative to the root) or content of readme markdown file for UI
 repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of the extension source repository
 
+
+# ----------------------------------------------------------------------
+# 2. EXTENSION DEPENDENCIES
+# ----------------------------------------------------------------------
 
 [dependencies]
 "omni.kit.commands" = {}
@@ -34,18 +42,34 @@ repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of th
 "omni.usd" = {}
 
 
+# ----------------------------------------------------------------------
+# 3. SETTINGS: APP.MENU
+# ----------------------------------------------------------------------
+
 [settings.app.menu]
 legacy_mode = false
 
+
+# ----------------------------------------------------------------------
+# 4. SETTINGS: EXTS."OMNI.KIT.VIEWPORT.MENUBAR.LIGHTING"
+# ----------------------------------------------------------------------
 
 [settings.exts."omni.kit.viewport.menubar.lighting"]
 rigs = "${my_company.my_usd_composer_setup_extension}/data/light_rigs"
 defaultRig = "Default"
 
 
+# ----------------------------------------------------------------------
+# 5. PYTHON ENTRY POINT
+# ----------------------------------------------------------------------
+
 [[python.module]]
 name = "my_company.my_usd_composer_setup_extension"
 
+
+# ----------------------------------------------------------------------
+# 6. DOCUMENTATION PAGES
+# ----------------------------------------------------------------------
 
 [documentation]
 pages = [
@@ -53,6 +77,10 @@ pages = [
     "docs/CHANGELOG.md",
 ]
 
+
+# ----------------------------------------------------------------------
+# 7. TEST CONFIGURATION
+# ----------------------------------------------------------------------
 
 [[test]]
 dependencies = [

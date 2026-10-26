@@ -14,7 +14,11 @@
 #   For most things refer to unittest docs:
 #   https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-from omni import ui
+import omni.ui as ui
+
+# ----------------------------------------------------------------------
+# 1. TEST
+# ----------------------------------------------------------------------
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the

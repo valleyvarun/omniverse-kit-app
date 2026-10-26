@@ -7,6 +7,7 @@ Transform-specific knob is colocated. The underlying op constants and the
 where the toolbar tools register them.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 # --- Standard library imports ---------------------------------------------
@@ -26,6 +27,7 @@ import omni.ui as ui
 import omni.usd
 from pxr import Gf, Tf, Usd  # type: ignore[reportMissingTypeStubs]
 
+# Local imports
 from ...active_context import get_active_usd_context
 
 # --- Local imports --------------------------------------------------------
@@ -35,9 +37,17 @@ from ...active_context import get_active_usd_context
 from ..tool_properties import ToolPropertiesPanel, build_xyz_row
 from .transform_tools import OP_MOVE, OP_ROTATE, OP_SCALE, TRANSFORM_OP_SETTING
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Module-wide logger; warnings only (failures here are non-fatal UI glitches).
 LOGGER = logging.getLogger(__name__)
+
+
+# ----------------------------------------------------------------------
+# 2. TRANSFORM PROPERTIES PANEL
+# ----------------------------------------------------------------------
 
 
 # ============================================================================
@@ -46,6 +56,7 @@ LOGGER = logging.getLogger(__name__)
 # local SRT via the standard TransformPrimSRTCommand.
 # ============================================================================
 class TransformPropertiesPanel(ToolPropertiesPanel):
+    # Track transform models and subscribe to tool and stage changes.
     def __init__(self, request_refresh: Callable[[], None]) -> None:
         super().__init__(request_refresh)
 
@@ -76,7 +87,8 @@ class TransformPropertiesPanel(ToolPropertiesPanel):
         settings = cast(Any, carb.settings.get_settings())
         try:
             self._setting_sub = settings.subscribe_to_node_change_events(
-                TRANSFORM_OP_SETTING, lambda *_args: self._refresh()  # type: ignore[reportUnknownLambdaType]
+                TRANSFORM_OP_SETTING,
+                lambda *_args: self._refresh(),  # type: ignore[reportUnknownLambdaType]
             )
         except Exception as exc:  # pragma: no cover
             LOGGER.warning("Could not subscribe to %s: %s", TRANSFORM_OP_SETTING, exc)
@@ -241,9 +253,7 @@ class TransformPropertiesPanel(ToolPropertiesPanel):
                 return None
             # Standard helper: returns (scale, rot_euler, rot_order, translation).
             get_srt = cast(Any, omni.usd).get_local_transform_SRT
-            scale, rot_euler, _order, translation = get_srt(
-                prim, cast(Any, Usd.TimeCode).Default()
-            )
+            scale, rot_euler, _order, translation = get_srt(prim, cast(Any, Usd.TimeCode).Default())
         except Exception as exc:
             LOGGER.warning("Failed to read transform for %s: %s", path, exc)
             return None

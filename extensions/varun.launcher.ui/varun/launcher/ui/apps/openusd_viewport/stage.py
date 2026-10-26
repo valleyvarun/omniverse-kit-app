@@ -8,17 +8,23 @@ No disk I/O is involved, so the per-Kit-build crate/usda
 ``Attempted to unpack unsupported type enum value 0``) do not apply.
 """
 
+# Python & library imports
 import asyncio
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.settings
 import omni.kit.app
 import omni.usd
 from pxr import Usd, UsdUtils
 
+# Local imports
 from .tab import DEFAULT_LIGHT_RIG
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +33,13 @@ LOGGER = logging.getLogger(__name__)
 # mode is applied. Keyed by the stage's StageCache long-int id (the same
 # id we store in ``Tab.stage_id``). An empty value means "Stage Lights".
 _LIGHTING_MODE_KEY = "/exts/omni.kit.viewport.menubar.lighting/lightingMode/{stage_id}"
+
+
+# --- STAGE CREATION AND CACHE LIFETIME ---
+
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def create_empty_stage() -> int | None:
@@ -91,6 +104,9 @@ def refresh_stage_id(ctx_name: str, current_id: int | None) -> int | None:
     return new_id
 
 
+# --- ATTACHMENT TO THE SHARED CONTEXT ---
+
+
 async def attach_stage(ctx_name: str, stage_id: int) -> bool:
     """Attach ``stage_id`` to the named UsdContext. Returns True on success."""
     if not ctx_name or stage_id is None:
@@ -129,6 +145,9 @@ async def attach_stage(ctx_name: str, stage_id: int) -> bool:
     except asyncio.TimeoutError:
         LOGGER.warning("attach_stage(%s) timed out", stage_id)
         return False
+
+
+# --- PER-STAGE LIGHTING ---
 
 
 def get_lighting_mode(ctx_name: str) -> str | None:
@@ -209,13 +228,18 @@ async def apply_lighting_mode(ctx_name: str, mode: str) -> None:
     except Exception as exc:
         LOGGER.warning(
             "SetLightingMenuModeCommand %r on %r failed: %s",
-            mode, ctx_name, exc,
+            mode,
+            ctx_name,
+            exc,
         )
 
 
 async def apply_default_light_rig(ctx_name: str) -> None:
     """Apply the default (``DEFAULT_LIGHT_RIG``) lighting mode. Best effort."""
     await apply_lighting_mode(ctx_name, DEFAULT_LIGHT_RIG)
+
+
+# --- SELECTION CLEANUP ---
 
 
 def clear_selection(ctx_name: str) -> None:

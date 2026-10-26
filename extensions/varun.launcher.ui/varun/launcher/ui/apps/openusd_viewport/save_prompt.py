@@ -1,11 +1,20 @@
 """Save / Don't Save / Cancel dirty-close prompt for viewport tabs."""
 
+# Python & library imports
 import asyncio
 import logging
 from typing import Any, Callable, cast
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
+
+
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def _stage_is_untitled(ctx: Any) -> bool:
@@ -48,6 +57,7 @@ def show_save_prompt(
         if on_confirmed is not None:
             on_confirmed()
         return
+    # Keep close, save, and cancellation callbacks tied to this tab.
 
     def _do_close() -> None:
         do_close()
@@ -83,6 +93,7 @@ def save_then_close(
 ) -> None:
     """Save the context's stage, then close the tab on success."""
 
+    # Forward successful saves to tab closure; leave failures open.
     def _on_done(success: bool) -> None:
         LOGGER.info("save_then_close(%r) -> success=%s", title, success)
         if success:
@@ -102,6 +113,7 @@ def save_then_close(
     # Backed by a file the user picked -> save in place via the async
     # wrapper so we get a proper (result, err, layers) tuple back.
     if not is_new:
+
         async def _save_in_place() -> None:
             try:
                 result_tuple = await ctx.save_stage_async()
@@ -121,6 +133,7 @@ def save_then_close(
     exporter: Any = None
     try:
         from omni.kit.window.file_exporter import get_file_exporter
+
         exporter = get_file_exporter()
     except Exception as exc:
         LOGGER.warning("file_exporter unavailable for %r: %s", title, exc)
@@ -130,6 +143,7 @@ def save_then_close(
         _on_done(False)
         return
 
+    # Validate the picked location before saving the stage.
     def _on_picked(
         filename: str,
         dirname: str,
@@ -139,7 +153,10 @@ def save_then_close(
         del selections
         LOGGER.info(
             "file picker for %r -> filename=%r dirname=%r ext=%r",
-            title, filename, dirname, extension,
+            title,
+            filename,
+            dirname,
+            extension,
         )
         if not filename:
             _on_done(False)
@@ -147,6 +164,7 @@ def save_then_close(
 
         # Build a proper URL the same way omni.kit.window.file does.
         import omni.client as _client  # type: ignore
+
         _dir = dirname
         if _dir and not _dir.endswith("/"):
             _dir = _dir + "/"

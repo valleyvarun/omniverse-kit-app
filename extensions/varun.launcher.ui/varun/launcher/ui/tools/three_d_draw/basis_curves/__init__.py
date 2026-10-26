@@ -6,6 +6,7 @@ does NOT touch any of the production tool's mutable state. Intended
 as a perf / look comparison against the production tool.
 """
 
+# Expose this package's public classes and helpers.
 from .three_d_draw_curves import ThreeDDrawCurvesTool
 
 __all__ = ["ThreeDDrawCurvesTool"]

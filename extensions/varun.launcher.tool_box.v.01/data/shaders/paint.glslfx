@@ -1,0 +1,103 @@
+-- glslfx version 0.1
+-- configuration
+{
+    "metadata": {"materialTag": "translucent"},
+    "parameters": {
+        "paintCoord": {"default": [0.0, 0.0]},
+        "paintSides": {"default": [1.0, 1.0]},
+        "paintDynamics": {"default": [1.0, 1.0]},
+        "paintMode": {"default": 0.0},
+        "paintPosition": {"default": [0.0, 0.0]},
+        "paintVersion": {"default": [0.0, 0.0]},
+        "paintHardness": {"default": [1.0, 1.0, 1.0, 1.0]},
+        "paintPoint0": {"default": [0.0, 0.0, 1.0, 1.0]},
+        "paintPoint1": {"default": [0.0, 0.0, 1.0, 1.0]},
+        "paintPoint2": {"default": [0.0, 0.0, 1.0, 1.0]},
+        "paintPoint3": {"default": [0.0, 0.0, 1.0, 1.0]}
+    },
+    "techniques": {"default": {"surfaceShader": {"source": ["Paint.Surface"]}, "displacementShader": {"source": ["Paint.Displacement"]}}}
+}
+-- glsl Paint.Surface
+float brushMetric(vec2 p, float shape)
+{
+    if (shape < 0.5) return length(p);
+    if (shape < 1.5) return max(abs(p.x), abs(p.y));
+    return max(-2.0 * p.y, sqrt(3.0) * abs(p.x) + p.y);
+}
+
+float brushCoverage(float distance, float hardness, float opacity)
+{
+    float feather = 1.0 - smoothstep(hardness, max(hardness + 1e-5, 1.0), distance);
+    float edge = 1.0 - smoothstep(1.0 - max(fwidth(distance), 1e-5), 1.0, distance);
+    return opacity * feather * edge;
+}
+
+float segmentCoverage(vec2 position, vec4 a, vec4 b, float ha, float hb, float shape)
+{
+    vec2 offset = position - a.xy;
+    vec2 edge = b.xy - a.xy;
+    float dr = b.z - a.z;
+    float t = 0.0;
+    float best = brushMetric(offset, shape) / max(a.z, 1e-6);
+    float endDistance = brushMetric(position - b.xy, shape) / max(b.z, 1e-6);
+    if (endDistance < best) { best = endDistance; t = 1.0; }
+    if (shape < 0.5) {
+        float denominator = dot(edge, edge) * a.z + dot(offset, edge) * dr;
+        float candidate = clamp((dot(offset, edge) * a.z + dot(offset, offset) * dr) / max(denominator, 1e-12), 0.0, 1.0);
+        float distance = length(offset - candidate * edge) / max(mix(a.z, b.z, candidate), 1e-6);
+        if (distance < best) { best = distance; t = candidate; }
+    } else {
+        // A polygon's distance is the maximum of its edge-plane distances.
+        vec4 base = shape < 1.5 ? vec4(offset, -offset) : vec4(-2.0 * offset.y, sqrt(3.0) * offset.x + offset.y, -sqrt(3.0) * offset.x + offset.y, -2.0 * offset.y);
+        vec4 slope = shape < 1.5 ? vec4(edge, -edge) : vec4(-2.0 * edge.y, sqrt(3.0) * edge.x + edge.y, -sqrt(3.0) * edge.x + edge.y, -2.0 * edge.y);
+        for (int i = 0; i < 4; ++i) for (int j = i + 1; j < 4; ++j) {
+            float denominator = slope[i] - slope[j];
+            float candidate = abs(denominator) > 1e-9 ? clamp((base[i] - base[j]) / denominator, 0.0, 1.0) : 0.0;
+            float distance = brushMetric(offset - candidate * edge, shape) / max(mix(a.z, b.z, candidate), 1e-6);
+            if (distance < best) { best = distance; t = candidate; }
+        }
+    }
+    return brushCoverage(best, mix(ha, hb, t), mix(a.w, b.w, t));
+}
+
+vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+    vec2 version = HdGet_paintVersion().xy;
+    if (version.x > 0.5) {
+        vec2 position = HdGet_paintPosition().xy;
+        vec4 a = HdGet_paintPoint0();
+        vec4 b = HdGet_paintPoint1();
+        vec4 c = HdGet_paintPoint2();
+        vec4 d = HdGet_paintPoint3();
+        vec4 hardness = clamp(HdGet_paintHardness(), 0.0, 1.0);
+        float coverage = max(segmentCoverage(position, a, b, hardness.x, hardness.y, version.y),
+                             segmentCoverage(position, b, c, hardness.y, hardness.z, version.y));
+        coverage = max(coverage, segmentCoverage(position, c, d, hardness.z, hardness.w, version.y));
+        if (coverage <= 0.0001) discard;
+        return vec4(color.rgb, coverage);
+    }
+    // Retain rendering support for older saved ribbon meshes.
+    vec2 coord = HdGet_paintCoord().xy;
+    vec2 sides = HdGet_paintSides().xy;
+    vec2 dynamics = clamp(HdGet_paintDynamics().xy, 0.0, 1.0);
+    float mode = HdGetScalar_paintMode();
+    float cross = abs(coord.x) / max(coord.x < 0.0 ? sides.x : sides.y, 1e-6);
+    float distance = cross;
+    if (mode > 3.5) {
+        if (mode < 4.5) distance = length(coord);
+        else if (mode < 5.5) distance = max(abs(coord.x), abs(coord.y));
+        else distance = max(-2.0 * coord.y, sqrt(3.0) * abs(coord.x) + coord.y);
+    } else if (mode > 0.5) {
+        if (mode < 1.5) distance = length(vec2(cross, coord.y));
+        else if (mode < 2.5) distance = max(cross, coord.y);
+        else distance = cross + coord.y;
+    }
+    float feather = 1.0 - smoothstep(dynamics.x, max(dynamics.x + 1e-5, 1.0), distance);
+    float edge = 1.0 - smoothstep(1.0 - max(fwidth(distance), 1e-5), 1.0, distance);
+    float coverage = dynamics.y * feather * edge;
+    if (coverage <= 0.0001) discard;
+    return vec4(color.rgb, coverage);
+}
+-- glsl Paint.Displacement
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{ return Peye; }

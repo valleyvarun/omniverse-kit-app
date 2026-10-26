@@ -7,9 +7,4 @@
 
 def Xform "World"
 {
-    def Cube "Cube"
-    {
-        double size = 2
-        float3[] extent = [(-1, -1, -1), (1, 1, 1)]
-    }
 }

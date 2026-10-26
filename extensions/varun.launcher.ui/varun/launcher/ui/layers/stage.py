@@ -1,14 +1,20 @@
-﻿from __future__ import annotations
+# Python & library imports
+from __future__ import annotations
 
 import logging
 from pathlib import Path
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.settings
 import omni.ui as ui
 
+# Local imports
 from ..tools.selection.selection import LockManager
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,20 +31,29 @@ _ICON_LOCKED = str(_ICONS_DIR / "lock_locked.svg")
 _ICON_UNLOCKED = str(_ICONS_DIR / "lock_unlocked.svg")
 
 
+# ----------------------------------------------------------------------
+# 2. STAGE LOCK COLUMN
+# ----------------------------------------------------------------------
+
+
 # Adds a "Lock" column to the Stage window. All lock state and enforcement
 # lives in selection.py LockManager - this class only owns the UI.
 class StageLockColumn:
+    # Store the lock manager and column registration handle.
     def __init__(self, lock_manager: LockManager) -> None:
         self._lock_manager = lock_manager
         self._column_sub: Any = None
 
+    # Register the lock column and make it visible.
     def apply(self) -> None:
         self._register_column()
         self._ensure_column_visible()
 
+    # Release the column registration handle.
     def destroy(self) -> None:
         self._column_sub = None
 
+    # Register a column factory bound to the lock manager.
     def _register_column(self) -> None:
         try:
             from omni.kit.widget.stage import StageColumnDelegateRegistry
@@ -46,15 +61,16 @@ class StageLockColumn:
             LOGGER.warning("StageLockColumn: stage widget API unavailable: %s", exc)
             return
         manager = self._lock_manager
+
         def _factory() -> Any:
             return _LockColumnDelegate(manager)
+
         try:
-            self._column_sub = cast(Any, StageColumnDelegateRegistry)().register_column_delegate(
-                _COLUMN_NAME, _factory
-            )
+            self._column_sub = cast(Any, StageColumnDelegateRegistry)().register_column_delegate(_COLUMN_NAME, _factory)
         except Exception as exc:
             LOGGER.warning("StageLockColumn: failed to register lock column: %s", exc)
 
+    # Add the lock column to saved and live column lists.
     def _ensure_column_visible(self) -> None:
         try:
             settings = cast(Any, carb.settings.get_settings())
@@ -70,13 +86,16 @@ class StageLockColumn:
             LOGGER.warning("StageLockColumn: failed to update column setting: %s", exc)
         try:
             import gc
+
             from omni.kit.widget.stage.column_menu import ColumnMenuModel  # type: ignore
+
             for obj in gc.get_objects():
                 if isinstance(obj, ColumnMenuModel):
                     self._enable_in_model(obj)
         except Exception:
             pass
 
+    # Check the lock entry in the current column model.
     def _enable_in_model(self, model: Any) -> None:
         try:
             for child in getattr(model, "_children", []) or []:
@@ -88,18 +107,35 @@ class StageLockColumn:
             pass
 
 
+# ----------------------------------------------------------------------
+# 3. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
+
+
+# Use Kit's column delegate when available.
 def _column_delegate_base() -> type:
     try:
         from omni.kit.widget.stage import AbstractStageColumnDelegate
+
         return cast(type, AbstractStageColumnDelegate)
     except Exception:
         return object
 
 
+# ----------------------------------------------------------------------
+# 4. SHARED STATE & EXPORTS
+# ----------------------------------------------------------------------
+
 _BaseColumnDelegate = _column_delegate_base()
 
 
+# ----------------------------------------------------------------------
+# 5. LOCK COLUMN DELEGATE
+# ----------------------------------------------------------------------
+
+
 class _LockColumnDelegate(_BaseColumnDelegate):  # type: ignore[misc, valid-type]
+    # Bind the column delegate to the lock manager.
     def __init__(self, manager: LockManager) -> None:
         try:
             cast(Any, super()).__init__()
@@ -107,29 +143,36 @@ class _LockColumnDelegate(_BaseColumnDelegate):  # type: ignore[misc, valid-type
             pass
         self._manager = manager
 
+    # No extra delegate cleanup is required.
     def destroy(self) -> None:
         pass
 
+    # Default width of the lock column.
     @property
     def initial_width(self) -> Any:
         return ui.Pixel(28)
 
+    # Smallest allowed lock column width.
     @property
     def minimum_width(self) -> Any:
         return ui.Pixel(20)
 
+    # Keep the lock column out of sorting.
     @property
     def sortable(self) -> bool:
         return False
 
+    # Place the lock column among the Stage columns.
     @property
     def order(self) -> int:
         return 50
 
+    # Allow users to resize the lock column.
     @property
     def resizable(self) -> bool:
         return True
 
+    # Center the lock icon in the column header.
     def build_header(self, **kwargs: Any) -> None:
         with ui.HStack():
             ui.Spacer()
@@ -141,6 +184,7 @@ class _LockColumnDelegate(_BaseColumnDelegate):  # type: ignore[misc, valid-type
             )
             ui.Spacer()
 
+    # Build a prim's lock toggle and subscribe its icon to changes.
     async def build_widget(self, item: Any, **kwargs: Any) -> None:
         if item is None or item.stage is None:
             return
@@ -176,6 +220,7 @@ class _LockColumnDelegate(_BaseColumnDelegate):  # type: ignore[misc, valid-type
         # Drop the listener when the underlying ui.Image is destroyed.
         def _on_destroy(*_args: Any) -> None:
             manager.remove_listener(_refresh)
+
         try:
             cast(Any, image).set_destroy_fn(_on_destroy)
         except Exception:

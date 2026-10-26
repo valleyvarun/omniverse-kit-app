@@ -1,0 +1,38 @@
+# ----------------------------------------------------------------------
+# 1. PACKAGE DETAILS
+# ----------------------------------------------------------------------
+
+[package]
+title = "Viewport Light interaction validation"
+version = "1.0.0"
+
+# ----------------------------------------------------------------------
+# 2. EXTENSION DEPENDENCIES
+# ----------------------------------------------------------------------
+
+[dependencies]
+"varun.launcher.usd_viewport.v.01" = {}
+"omni.kit.ui_test" = {}
+"omni.kit.menu.create" = {}
+"omni.kit.renderer.capture" = {}
+
+# ----------------------------------------------------------------------
+# 3. DEFAULT SETTINGS
+# ----------------------------------------------------------------------
+
+[settings]
+app.window.width = 1200
+app.window.height = 800
+app.window.dpiScaleOverride = 1.0
+app.window.title = "Viewport Light interaction validation"
+app.settings.persistent = false
+app.settings.loadUserConfig = false
+app.settings.saveUserConfig = false
+app.exts.registryEnabled = false
+app.exts.autoUpdate = false
+app.exts.fsWatcherEnabled = false
+app.content.emptyStageOnStart = false
+app.fastShutdown = true
+exts."omni.kit.viewport.ready".startup.enabled = false
+exts."omni.kit.ui_test".humanDelay = 0.2
+crashreporter.enabled = false

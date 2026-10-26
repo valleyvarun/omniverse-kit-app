@@ -27,23 +27,31 @@ The production tool's modules are NOT modified. This file owns its own
 constants, USD root, and stroke state; nothing leaks back the other way.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
 import numpy as np
+
+# Omniverse & USD imports
 import omni.kit.app
 import omni.usd
 from pxr import Gf, Sdf, Usd, UsdGeom, Vt
 
+from ....active_context import get_active_stage, get_active_usd_context
+from ...tool import Tool
+
+# Local imports
 from ..brush_config import BrushConfig
 from ..cursor_3d import Cursor3D
 from ..escape_handler import EscapeHandler
 from ..viewport_suppression import ViewportSuppression
-from ...tool import Tool
-from ....active_context import get_active_stage, get_active_usd_context
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -74,12 +82,18 @@ SAMPLE_MIN_DISTANCE = 0.1
 STROKE_COLOR = (0.0, 0.0, 0.0)
 
 
+# ----------------------------------------------------------------------
+# 2. THREE DDRAW CURVES TOOL
+# ----------------------------------------------------------------------
+
+
 class ThreeDDrawCurvesTool:
     NAME = "three_d_draw_curves"
     LABEL = "3DC"
     SHORTCUT = "SHIFT+D"
     TOOLTIP = "3D Draw (BasisCurves, experimental)"
 
+    # Track the cursor, active curve, and pending stroke samples.
     def __init__(self) -> None:
         self._tool: Tool | None = None
         self._is_active = False
@@ -100,6 +114,8 @@ class ThreeDDrawCurvesTool:
         self._viewport_suppression = ViewportSuppression()
         self._escape = EscapeHandler()
         self._brush_listener: Any = None
+
+    # --- TOOL BUTTON AND ACTIVATION ---
 
     # BUILD THE TOOLBAR TOOL DESCRIPTOR.
     def make_tool(self) -> Tool:
@@ -200,6 +216,8 @@ class ThreeDDrawCurvesTool:
 
     # ----- Drawing -----
 
+    # --- STROKE INPUT ---
+
     # CURSOR LMB-DOWN: start a new stroke. We do NOT author the live
     # BasisCurves prim yet -- linear/nonperiodic curves require >= 2
     # vertices per curve, so a single-sample prim triggers Hydra and
@@ -254,6 +272,7 @@ class ThreeDDrawCurvesTool:
         if stroke_path:
             try:
                 from ....layers.layers import GroupRegistry
+
                 registry = GroupRegistry.get()
                 if registry is not None:
                     registry.assign_new_stroke(stroke_path)
@@ -264,6 +283,9 @@ class ThreeDDrawCurvesTool:
 
     # ----- Per-frame ticking -----
 
+    # --- FRAME UPDATES AND CURVE SAMPLES ---
+
+    # Subscribe to frame updates while drawing a curve.
     def _start_emitting(self) -> None:
         if self._update_sub is not None:
             return
@@ -276,6 +298,7 @@ class ThreeDDrawCurvesTool:
         except Exception:
             self._update_sub = None
 
+    # Release the drawing update subscription.
     def _stop_emitting(self) -> None:
         if self._update_sub is not None:
             try:
@@ -284,6 +307,7 @@ class ThreeDDrawCurvesTool:
                 pass
             self._update_sub = None
 
+    # Append resampled cursor positions to the live curve.
     def _on_update(self, e: Any) -> None:
         if not self._drawing:
             return
@@ -311,6 +335,8 @@ class ThreeDDrawCurvesTool:
             self._dirty = False
 
     # ----- USD authoring -----
+
+    # --- USD CURVE AUTHORING ---
 
     # Ensure /World/ThreeDDrawCurves exists. Caller owns the EditContext.
     def _ensure_root(self, stage: Any) -> None:
@@ -348,9 +374,7 @@ class ThreeDDrawCurvesTool:
                     pass
                 # Constant displayColor (single value covers the prim).
                 color_attr = curves.CreateDisplayColorAttr()
-                color_attr.Set(
-                    cast(Any, Vt).Vec3fArray([Gf.Vec3f(*STROKE_COLOR)])
-                )
+                color_attr.Set(cast(Any, Vt).Vec3fArray([Gf.Vec3f(*STROKE_COLOR)]))
                 try:
                     curves.GetDisplayColorPrimvar().SetInterpolation("constant")
                 except Exception:
@@ -410,8 +434,6 @@ class ThreeDDrawCurvesTool:
         try:
             with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):
                 self._ensure_root(stage)
-            return cast(Any, omni.usd.get_stage_next_free_path)(
-                stage, f"{DRAW_ROOT}/Stroke", False
-            )
+            return cast(Any, omni.usd.get_stage_next_free_path)(stage, f"{DRAW_ROOT}/Stroke", False)
         except Exception:
             return f"{DRAW_ROOT}/Stroke"

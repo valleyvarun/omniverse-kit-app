@@ -1,0 +1,27 @@
+[package]
+title = "Tool Box viewport host validation"
+version = "1.0.0"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.hydra.pxr" = {}
+"omni.kit.renderer.capture" = {}
+"varun.launcher.tool_box.v.01" = {}
+
+[settings]
+app.window.width = 1200
+app.window.height = 800
+app.settings.persistent = false
+app.settings.loadUserConfig = false
+app.settings.saveUserConfig = false
+app.exts.registryEnabled = false
+app.exts.autoUpdate = false
+app.content.emptyStageOnStart = false
+app.fastShutdown = true
+app.vulkan = true
+app.useFabricSceneDelegate = false
+renderer.enabled = "pxr"
+renderer.active = "pxr"
+pxr.rendermode = "HdStormRendererPlugin"
+exts."omni.kit.renderer.core".compatibilityMode = true
+exts."omni.kit.viewport.window".startup.disableWindowOnLoad = true

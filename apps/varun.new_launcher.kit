@@ -16,6 +16,10 @@ keywords = ["app"]  # That makes it browsable in UI with "app" filter
 
 
 [dependencies]
+"varun.launcher.gpu" = {}  # Detect adapters before graphics initialization
+# Both Windows graphics paths must have their core shader cache available
+# before adapter detection chooses DX12 (NVIDIA) or Vulkan (compatibility).
+"filter:platform"."windows-x86_64"."omni.gpu_foundation.shadercache.d3d12" = {}
 "omni.kit.uiapp" = {}  # Base UI application
 "omni.kit.mainwindow" = {}  # Main window that hosts the menu bar
 "omni.kit.menu.utils" = {}  # Menu bar framework
@@ -25,20 +29,49 @@ keywords = ["app"]  # That makes it browsable in UI with "app" filter
 "varun.launcher.custom_menu.v.01" = {}  # Custom application menus
 "varun.launcher.workspace.v.01" = {}  # Workspace tabs bar
 "varun.launcher.home.v.01" = {}  # Home page
-"varun.launcher.usd_viewport.v.01" = {}  # Floating USD viewport
+"varun.launcher.usd_viewport.v.01" = {}  # USD viewport
+"varun.launcher.tool_box.v.01" = {}  # Bottom transform and drawing tools
+"varun.launcher.command_line.v.01" = {}  # Keyboard command entry
+"varun.launcher.clayers.v.01" = {}  # Communication layers
+"varun.launcher.explorer.v.01" = {}  # Project folder browser
+"varun.launcher.plexus.v.01" = {}  # OmniGraph workspace tabs
+"omni.kit.widget.layers" = {}  # Composer Layer panel
+"omni.kit.window.stage" = {}  # Composer Stage panel
 
+
+[settings]
+# Start the graphics device without requiring RTX on Intel/AMD systems.
+# Early GPU startup enables RTX capabilities on NVIDIA before device creation;
+# the viewport then loads the optional RTX engines only on an NVIDIA device.
+exts."omni.kit.renderer.core".compatibilityMode = true
+renderer.enabled = "pxr"
+renderer.active = "pxr"
+pxr.rendermode = "HdStormRendererPlugin"
 
 [settings.app]
+vulkan = true
+launcher.autoGpu = true
+useFabricSceneDelegate = false
 font.file = "${fonts}/OpenSans-SemiBold.ttf"
 font.size = 18
 window.title = "varun_new_launcher"
 
 
+# applied before extensions load, so the lighting menubar can't seed it to true
+[settings.persistent.exts."omni.kit.viewport.menubar.lighting".autoLightRig]
+enabled = false
+
+
 [settings.app.launcher.layout]
+top_window = "command_line"
 tabs_window = "tabs_bar_window"
+bottom_window = "Tool Box"
+right_top_window = "Clayers"
+left_window = "Explorer"
 
 
 [settings.app.exts]
+enabled = []  # Version lock for dependencies; resolved by the application build.
 folders.'++' = [  # Search paths for extensions.
 	"${app}/../exts",
 	"${app}/../extscache/"
@@ -52,7 +85,3 @@ type = "ApplicationTemplate" # Repo Template Metadata
 
 # Kit SDK Version: 109.0.3+production.263267.62477c11.gl
 
-# Version lock for all dependencies:
-[settings.app.exts]
-enabled = [
-]

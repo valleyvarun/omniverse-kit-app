@@ -29,21 +29,27 @@ because they call `deferred_dock_in(...)` in their constructors, which
 re-attaches them to whichever dock node has the matching window name.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 import asyncio
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.kit.app
 import omni.ui as ui
 import omni.usd
 
+# Local imports
 from ..active_context import (
     add_active_context_listener,
     remove_active_context_listener,
 )
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,9 +66,15 @@ LAYER_WINDOW = "Layer"
 SIBLING_WINDOWS: tuple[str, ...] = ("Clayers",)
 
 
+# ----------------------------------------------------------------------
+# 2. KIT PANEL REBINDER
+# ----------------------------------------------------------------------
+
+
 class KitPanelRebinder:
     """Keeps Kit's Stage + Layer panels bound to the active viewport's stage."""
 
+    # Track installation and the pending panel rebuild.
     def __init__(self) -> None:
         self._installed = False
         # Coalesce rapid-fire context changes (e.g. dock callbacks firing
@@ -70,6 +82,7 @@ class KitPanelRebinder:
         # back-to-back) so we only rebuild once.
         self._pending_task: asyncio.Task[Any] | None = None
 
+    # Listen for active context changes once.
     def apply(self) -> None:
         if self._installed:
             return
@@ -80,6 +93,7 @@ class KitPanelRebinder:
     def rebind_now(self) -> None:
         self._on_active_context_changed()
 
+    # Remove the context listener and cancel the pending rebuild.
     def destroy(self) -> None:
         if not self._installed:
             return
@@ -94,6 +108,7 @@ class KitPanelRebinder:
 
     # ---------------------------------------------------------------- internals
 
+    # Queue one rebuild for a burst of tab changes.
     def _on_active_context_changed(self) -> None:
         # Debounce: if a rebuild is already queued, let it run.
         if self._pending_task is not None and not self._pending_task.done():
@@ -103,11 +118,16 @@ class KitPanelRebinder:
         except Exception:
             self._pending_task = None
 
+    # Recreate Stage and Layer panels while preserving dock selection.
     async def _rebuild_async(self) -> None:
         try:
+            # --- 1) RETARGET THE LAYER EXTENSION ---
+
             # Update LayerExtension's cached context BEFORE the rebuild so
             # the recreated LayerWindow binds to the new context.
             self._retarget_layer_extension()
+
+            # --- 2) SAVE THE CURRENT DOCK SELECTION ---
 
             # Remember which tab in the Stage/Layer/Clayers dock group is
             # currently selected so we can restore it after recreate.
@@ -115,6 +135,8 @@ class KitPanelRebinder:
             # front of its group, which is exactly the behaviour the user
             # complained about; this snapshot lets us undo it.
             previously_selected = self._snapshot_selected_sibling()
+
+            # --- 3) RECREATE THE CACHED PANELS ---
 
             # Tear down both windows. Each extension's
             # `_visibility_changed_fn` schedules an async destroy when
@@ -147,6 +169,8 @@ class KitPanelRebinder:
                     await app.next_update_async()
                 except Exception:
                     return
+
+            # --- 4) RESTORE THE USER'S SELECTED PANEL ---
 
             # Restore whichever tab the user actually had selected before
             # the rebuild. If nothing was tracked (or that tab no longer
@@ -231,6 +255,7 @@ class KitPanelRebinder:
         except Exception:
             pass
 
+    # Hide the named Kit window if it exists.
     @staticmethod
     def _hide(window_name: str) -> None:
         try:
@@ -244,6 +269,7 @@ class KitPanelRebinder:
         except Exception:
             pass
 
+    # Ask Kit to show the named window.
     @staticmethod
     def _show(window_name: str) -> None:
         try:

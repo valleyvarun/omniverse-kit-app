@@ -8,6 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# ----------------------------------------------------------------------
+# 1. PACKAGE DETAILS
+# ----------------------------------------------------------------------
+
 [package]
 title = "varun_launcher_home"
 version = "01"  # Semantic Versioning is used: https://semver.org/
@@ -21,16 +25,33 @@ readme  = "docs/README.md"  # Path (relative to the root) or content of readme m
 repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"  # URL of the extension source repository
 
 
+# ----------------------------------------------------------------------
+# 2. EXTENSION DEPENDENCIES
+# ----------------------------------------------------------------------
+
 [dependencies]
 "omni.kit.uiapp" = {}
+"omni.kit.actions.core" = {}
 
+
+# ----------------------------------------------------------------------
+# 3. DEFAULT SETTINGS
+# ----------------------------------------------------------------------
 
 [settings]
 
 
+# ----------------------------------------------------------------------
+# 4. PYTHON ENTRY POINT
+# ----------------------------------------------------------------------
+
 [[python.module]]  # Main python module this extension provides, it will be publicly available as "import varun.launcher.home.v.01"
 name = "varun.launcher.home.v.01"
 
+
+# ----------------------------------------------------------------------
+# 5. DOCUMENTATION PAGES
+# ----------------------------------------------------------------------
 
 [documentation]
 pages = [
@@ -38,6 +59,10 @@ pages = [
     "docs/CHANGELOG.md",
 ]
 
+
+# ----------------------------------------------------------------------
+# 6. TEST CONFIGURATION
+# ----------------------------------------------------------------------
 
 [[test]]
 dependencies = [

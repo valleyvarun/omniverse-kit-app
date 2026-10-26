@@ -26,16 +26,19 @@ Lifecycle:
 * ``destroy``         -- tear down viewport, release every stage.
 """
 
+# Python & library imports
 import asyncio
 import gc
 import logging
 from typing import Any, Callable, cast
 
+# Omniverse & USD imports
 import omni.kit.app
 import omni.ui as ui
 import omni.usd
 from omni.kit.viewport.window import ViewportWindow
 
+# Local imports
 from ...active_context import set_active_context_name
 from .docking import set_updates_enabled
 from .save_prompt import show_save_prompt
@@ -56,8 +59,16 @@ from .tab import (
     ViewportDockCallback,
 )
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
+
+
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 def _suppress_native_tab_bar(vp: ViewportWindow) -> None:
@@ -74,9 +85,15 @@ def _suppress_native_tab_bar(vp: ViewportWindow) -> None:
             pass
 
 
+# ----------------------------------------------------------------------
+# 3. OPEN USD VIEWPORT MANAGER
+# ----------------------------------------------------------------------
+
+
 class OpenUsdViewportManager:
     """Owns viewport tabs. One UsdContext, one ViewportWindow, N stages."""
 
+    # INITIALIZE SHARED VIEWPORT AND TAB STATE
     def __init__(
         self,
         on_dock_changed: ViewportDockCallback | None = None,
@@ -113,7 +130,8 @@ class OpenUsdViewportManager:
         except Exception as exc:
             LOGGER.warning(
                 "Could not create shared context %r: %s",
-                SHARED_CTX_NAME, exc,
+                SHARED_CTX_NAME,
+                exc,
             )
 
         self._subscribe_stage_events()
@@ -127,6 +145,7 @@ class OpenUsdViewportManager:
         # window joins Home's node instead of becoming a floater.
         self._build_viewport()
 
+    # Add the initial viewport tab once.
     def create_default_viewport(self) -> None:
         if any(t.title == FIRST_VIEWPORT_TITLE for t in self._tabs):
             return
@@ -134,10 +153,12 @@ class OpenUsdViewportManager:
 
     # PUBLIC API ----------------------------------------------------------
 
+    # Return the initial viewport tab label.
     @property
     def first_viewport_title(self) -> str:
         return FIRST_VIEWPORT_TITLE
 
+    # Choose an unused tab title and focus the new tab.
     def spawn_new_tab(self) -> str:
         index = len(self._tabs) + 1
         while True:
@@ -149,11 +170,15 @@ class OpenUsdViewportManager:
         self.focus_tab(title)
         return title
 
+    # Toggle rendering only for the active tab.
     def set_updates(self, title: str, enabled: bool) -> None:
         if self._active_vp is None or self._active_title != title:
             return
         set_updates_enabled(self._active_vp, enabled)
 
+    # --- TAB SELECTION AND CLOSING ---
+
+    # Save the outgoing view and attach the selected tab's stage.
     def focus_tab(self, title: str) -> bool:
         tab = self._find_tab(title)
         if tab is None:
@@ -177,6 +202,7 @@ class OpenUsdViewportManager:
             prev_tab.stage_id = refresh_stage_id(SHARED_CTX_NAME, prev_tab.stage_id)
             self._save_viewport_state(prev_tab, self._active_vp)
 
+        # Track this request so older attach tasks can be ignored.
         self._active_title = title
         self._gen += 1
         my_gen = self._gen
@@ -213,6 +239,7 @@ class OpenUsdViewportManager:
             self._save_viewport_state(prev_tab, self._active_vp)
         self._active_title = None
 
+    # Remove the tab and release its cached stage.
     def close_viewport(self, title: str) -> bool:
         tab = self._find_tab(title)
         if tab is None:
@@ -228,12 +255,14 @@ class OpenUsdViewportManager:
         release_stage(tab.stage_id)
         return True
 
+    # Prompt for unsaved changes before removing a tab.
     def close_viewport_with_prompt(
         self,
         title: str,
         on_confirmed: Callable[[], None] | None = None,
         on_cancelled: Callable[[], None] | None = None,
     ) -> None:
+        # Resolve the requested tab before checking its unsaved state.
         tab = self._find_tab(title)
         if tab is None:
             if on_confirmed is not None:
@@ -286,6 +315,9 @@ class OpenUsdViewportManager:
             on_cancelled=on_cancelled,
         )
 
+    # --- MANAGER SHUTDOWN ---
+
+    # Cancel pending work and release stages, subscriptions, and the viewport.
     def destroy(self) -> None:
         self._alive = False
         if self._stage_event_sub is not None:
@@ -309,6 +341,7 @@ class OpenUsdViewportManager:
 
     # INTERNAL ------------------------------------------------------------
 
+    # Find tab metadata by its displayed title.
     def _find_tab(self, title: str | None) -> Tab | None:
         if not title:
             return None
@@ -319,6 +352,7 @@ class OpenUsdViewportManager:
 
     # TAB RENAME ON SAVE / OPEN -------------------------------------------
 
+    # Listen for changes in the active USD context.
     def _subscribe_stage_events(self) -> None:
         try:
             ctx = cast(Any, omni.usd).get_context(SHARED_CTX_NAME)
@@ -330,6 +364,7 @@ class OpenUsdViewportManager:
         except Exception:
             self._stage_event_sub = None
 
+    # Refresh the active tab's name after a stage opens or saves.
     def _on_stage_event(self, event: Any) -> None:
         # Rename the active tab after a Save or Open binds its stage to a
         # real file. Both events also fire for our own in-memory stage
@@ -354,6 +389,7 @@ class OpenUsdViewportManager:
         name = identifier.replace("\\", "/").rstrip("/")
         return name.rsplit("/", 1)[-1]
 
+    # Update the tab title and cached stage after file operations.
     def _maybe_rename_active_tab(self) -> None:
         title = self._active_title
         if not title:
@@ -407,6 +443,9 @@ class OpenUsdViewportManager:
             except Exception:
                 pass
 
+    # --- BACKGROUND STAGE ATTACHMENT ---
+
+    # Schedule background work and track it until completion.
     def _spawn_task(self, coro: Any) -> None:
         try:
             task = asyncio.ensure_future(coro)
@@ -416,22 +455,26 @@ class OpenUsdViewportManager:
         self._pending_tasks.append(task)
         task.add_done_callback(self._on_task_done)
 
+    # Remove completed work from the pending task list.
     def _on_task_done(self, task: "asyncio.Task[Any]") -> None:
         try:
             self._pending_tasks.remove(task)
         except ValueError:
             pass
 
+    # Serialize stage changes and ignore superseded tab requests.
     async def _run_attach(self, tab: Tab, my_gen: int) -> None:
         async with self._lock:
             if not self._alive or my_gen != self._gen:
                 return
+            # Pause rendering and clear selection before swapping stages.
             if self._active_vp is not None:
                 set_updates_enabled(self._active_vp, False)
             clear_selection(SHARED_CTX_NAME)
 
             first_focus = tab.stage_id is None
             if first_focus:
+                # Create the tab's initial stage only when first needed.
                 stage_id = create_empty_stage()
                 if stage_id is None:
                     return
@@ -459,6 +502,7 @@ class OpenUsdViewportManager:
                 # re-cache so future re-attaches use the current one.
                 tab.stage_id = refresh_stage_id(SHARED_CTX_NAME, tab.stage_id)
 
+            # Restore view settings after attachment and lighting settle.
             if self._active_vp is not None:
                 self._restore_viewport_state(tab, self._active_vp)
                 set_updates_enabled(self._active_vp, True)
@@ -483,6 +527,8 @@ class OpenUsdViewportManager:
             if mode is None:
                 mode = DEFAULT_LIGHT_RIG
             await apply_lighting_mode(SHARED_CTX_NAME, mode)
+
+    # --- VIEWPORT CONSTRUCTION AND DOCKING ---
 
     def _build_viewport(self) -> None:
         """Construct + dock the single ViewportWindow at manager init time.
@@ -542,6 +588,7 @@ class OpenUsdViewportManager:
         The viewport is kept ``visible=False`` for the whole wait so
         the user never sees a 1280x720 floater while Kit settles.
         """
+        # Keep the viewport hidden while its dock placement is unresolved.
         app = cast(Any, omni.kit.app.get_app())
 
         # Phase 1: wait for the docked state to stabilize. The
@@ -567,10 +614,7 @@ class OpenUsdViewportManager:
 
         # Phase 2: if we never got a stable dock, force one.
         if stable < stable_target:
-            LOGGER.warning(
-                "viewport never auto-docked into Home; falling back to "
-                "explicit dock_in()"
-            )
+            LOGGER.warning("viewport never auto-docked into Home; falling back to explicit dock_in()")
             home = ui.Workspace.get_window("Home")
             if home is not None:
                 try:
@@ -628,6 +672,7 @@ class OpenUsdViewportManager:
             return False
         return vp_dock >= 0 and vp_dock == home_dock
 
+    # Dock, reveal, and focus the shared viewport.
     def _raise_vp(self) -> None:
         if self._active_vp is None:
             return
@@ -660,6 +705,7 @@ class OpenUsdViewportManager:
         except Exception:
             pass
 
+    # Stop rendering and release the viewport window.
     def _teardown_viewport(self) -> None:
         vp = self._active_vp
         self._active_vp = None
@@ -677,6 +723,9 @@ class OpenUsdViewportManager:
         del vp
         gc.collect()
 
+    # --- PER-TAB VIEW SETTINGS ---
+
+    # Remember this tab's lighting and viewport settings.
     def _save_viewport_state(self, tab: Tab, vp: ViewportWindow) -> None:
         # Capture the tab's current lighting mode so it's restored (not
         # reset to Stage Lights) the next time the user comes back to it.
@@ -710,6 +759,7 @@ class OpenUsdViewportManager:
                 value = str(value) if value else ""
             setattr(tab.state, attr, value)
 
+    # Apply the selected tab's saved viewport settings.
     def _restore_viewport_state(self, tab: Tab, vp: ViewportWindow) -> None:
         try:
             api = cast(Any, vp).viewport_api

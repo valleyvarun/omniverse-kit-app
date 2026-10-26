@@ -1,3 +1,4 @@
+# Python & library imports
 from __future__ import annotations
 
 # --- Standard library imports ---------------------------------------------
@@ -18,15 +19,23 @@ import omni.ui as ui
 from ..startup.styles import AGENT_WINDOW_BACKGROUND_STYLE
 from ..windows.window import LauncherWindow
 
-
 # ============================================================================
 # SHARED PANEL BASE + HELPERS
 # ============================================================================
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Axis labels and matching colors used by transform-style XYZ rows.
 # omni.ui colors are 0xAABBGGRR -> X red, Y green, Z blue.
 AXIS_LABELS = ("X", "Y", "Z")
 AXIS_COLORS = (0xFF5555FF, 0xFF55FF55, 0xFFFF7755)
+
+
+# ----------------------------------------------------------------------
+# 2. TOOL PROPERTIES PANEL
+# ----------------------------------------------------------------------
 
 
 # Base interface for the per-tool property panels. The window owns ONE
@@ -35,6 +44,7 @@ AXIS_COLORS = (0xFF5555FF, 0xFF55FF55, 0xFFFF7755)
 # `build_into(frame)`. Panels manage their own subscriptions and call
 # `_refresh()` to ask the window to re-evaluate.
 class ToolPropertiesPanel:
+    # Store the callback used to request a panel rebuild.
     def __init__(self, request_refresh: Callable[[], None]) -> None:
         # Stash the callback the window passed us so we can ping it later.
         self._request_refresh = request_refresh
@@ -58,6 +68,11 @@ class ToolPropertiesPanel:
         except Exception:
             # The window may already be torn down; ignore.
             pass
+
+
+# ----------------------------------------------------------------------
+# 3. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 # Build a labeled X/Y/Z row of three FloatDrag fields. Returns the value
@@ -95,12 +110,18 @@ def build_xyz_row(
     return models, subs
 
 
+# ----------------------------------------------------------------------
+# 4. TOOL PROPERTIES WINDOW
+# ----------------------------------------------------------------------
+
+
 # ============================================================================
 # BOTTOM-DOCK WINDOW
 # Owns a single content frame and a list of per-tool panels. The first
 # panel whose `is_active()` returns True is rendered into the frame.
 # ============================================================================
 class ToolPropertiesWindow(LauncherWindow):
+    # Create tool panels and the window that hosts their properties.
     def __init__(self) -> None:
         # Lazy imports: each per-tool panel lives next to its tool's
         # settings (`three_d_draw/tool_settings.py`,
@@ -179,6 +200,10 @@ class ToolPropertiesWindow(LauncherWindow):
                 continue
         return None
 
+
+# ----------------------------------------------------------------------
+# 5. SHARED STATE & EXPORTS
+# ----------------------------------------------------------------------
 
 # Public API of this module: just the window class.
 __all__: list[str] = ["ToolPropertiesWindow"]

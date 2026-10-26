@@ -1,17 +1,21 @@
-﻿from __future__ import annotations
+# Python & library imports
+from __future__ import annotations
 
 import asyncio
 import logging
 from pathlib import Path
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.input
 import omni.appwindow
 import omni.kit.app
 import omni.ui as ui
 import omni.usd
 
+# Local imports
 from ..active_context import get_active_stage
+from ..tools.selection.selection import SelectionSync
 from .layers import (
     DEFAULT_GROUND_PLANE_PATH,
     GROUP_ANCHOR_ROOT,
@@ -22,8 +26,10 @@ from .layers import (
     LockManager,
     VisibilityManager,
 )
-from ..tools.selection.selection import SelectionSync
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,8 +106,14 @@ _BUTTON_STYLE = {
 }
 
 
+# ----------------------------------------------------------------------
+# 2. ITEM
+# ----------------------------------------------------------------------
+
+
 # DESCRIBES A SINGLE ROW IN THE C_LAYERS WINDOW.
 class _Item:
+    # Store the type, label, depth, and target of one tree row.
     def __init__(
         self,
         kind: str,
@@ -125,11 +137,17 @@ class _Item:
         return f"path:{self.path}"
 
 
+# ----------------------------------------------------------------------
+# 3. CLAYERS PANEL
+# ----------------------------------------------------------------------
+
+
 # C_LAYERS WINDOW PANEL. RENDERS DRAWING PLANES, STROKES, AND VIRTUAL GROUPS
 # WITH FOUR COLUMNS (TYPE, VISIBILITY, LOCK, ACTIVE) PLUS A BOTTOM BUTTON BAR
 # WITH GROUP/UNGROUP ACTIONS. ALL STATE LIVES IN THE CENTRAL MANAGERS IN
 # layers.py.
 class ClayersPanel:
+    # Track panel widgets, row selection, and manager callbacks.
     def __init__(self) -> None:
         self._frame: ui.Frame | None = None
         self._list_frame: ui.Frame | None = None
@@ -182,6 +200,7 @@ class ClayersPanel:
         self._wire_listeners()
         self._subscribe_keyboard()
 
+    # Match header and footer widths to the scrollbar gutter.
     def _sync_gutter(self) -> None:
         w = _SCROLLBAR_GUTTER if self._scroll_frame.scroll_y_max > 0 else ui.Pixel(0)
         self._header_gutter.width = w
@@ -274,13 +293,12 @@ class ClayersPanel:
             app_window: Any = omni.appwindow.get_default_app_window()  # type: ignore[reportUnknownMemberType]
             keyboard = app_window.get_keyboard()
             input_iface = cast(Any, carb.input.acquire_input_interface())
-            self._keyboard_sub = input_iface.subscribe_to_keyboard_events(
-                keyboard, self._on_keyboard_event
-            )
+            self._keyboard_sub = input_iface.subscribe_to_keyboard_events(keyboard, self._on_keyboard_event)
         except Exception as exc:
             LOGGER.warning("CLayers: could not subscribe to keyboard events: %s", exc)
             self._keyboard_sub = None
 
+    # Release the keyboard event subscription.
     def _unsubscribe_keyboard(self) -> None:
         if self._keyboard_sub is None:
             return
@@ -302,10 +320,7 @@ class ClayersPanel:
             key = event.input
         except Exception:
             return True
-        if (
-            event_type == carb.input.KeyboardEventType.KEY_PRESS
-            and key == carb.input.KeyboardInput.ESCAPE
-        ):
+        if event_type == carb.input.KeyboardEventType.KEY_PRESS and key == carb.input.KeyboardInput.ESCAPE:
             if self._selected_row_keys:
                 self._selected_row_keys.clear()
                 groups = GroupRegistry.get()
@@ -314,6 +329,8 @@ class ClayersPanel:
                 else:
                     self._schedule_rebuild()
         return True
+
+    # --- TABLE HEADER AND COLUMNS ---
 
     # COLUMN HEADER ROW.
     def _build_header(self) -> None:
@@ -433,6 +450,8 @@ class ClayersPanel:
 
     # ----- list rendering -----
 
+    # --- ROW COLLECTION AND REBUILDING ---
+
     # COLLECT ALL ROWS RECURSIVELY (TOP-LEVEL FIRST, GROUPS NESTED).
     def _collect_items(self) -> list[_Item]:
         items: list[_Item] = []
@@ -536,6 +555,8 @@ class ClayersPanel:
             asyncio.ensure_future(_do())
         except Exception:
             self._rebuild_pending = False
+
+    # --- ROW CELLS AND CLICK HANDLERS ---
 
     # BUILD A SINGLE ROW.
     def _build_row(self, item: _Item, active_path: str) -> None:
@@ -662,6 +683,7 @@ class ClayersPanel:
         def _pressed(_x: float, _y: float, button: int, _m: int) -> None:
             if button == 0:
                 _toggle()
+
         cast(Any, image).set_mouse_pressed_fn(_pressed)
 
     # VISIBILITY COLUMN. USD-BACKED ROWS AND GROUP ROWS BOTH PARTICIPATE.
@@ -680,6 +702,7 @@ class ClayersPanel:
                 if mgr is None:
                     return
                 mgr.set_visible(gid, not mgr.is_visible_self(gid))
+
             cast(Any, image).set_mouse_pressed_fn(_group_pressed)
             return
         if item.prim is None:
@@ -704,6 +727,7 @@ class ClayersPanel:
         def _pressed(_x: float, _y: float, button: int, _m: int) -> None:
             if button == 0:
                 _click()
+
         cast(Any, image).set_mouse_pressed_fn(_pressed)
 
     # LOCK COLUMN. USD-BACKED ROWS AND GROUP ROWS BOTH PARTICIPATE.
@@ -722,6 +746,7 @@ class ClayersPanel:
                 if mgr is None:
                     return
                 mgr.set_locked(gid, not mgr.is_locked_self(gid))
+
             cast(Any, image).set_mouse_pressed_fn(_group_pressed)
             return
         if item.prim is None:
@@ -749,6 +774,7 @@ class ClayersPanel:
         def _pressed(_x: float, _y: float, button: int, _m: int) -> None:
             if button == 0:
                 _click()
+
         cast(Any, image).set_mouse_pressed_fn(_pressed)
 
     # ACTIVE COLUMN. DRAWING PLANES (SINGLE-ACTIVE GLOBALLY) AND GROUPS
@@ -768,6 +794,7 @@ class ClayersPanel:
             def _plane_pressed(_x: float, _y: float, button: int, _m: int) -> None:
                 if button == 0:
                     _plane_click()
+
             cast(Any, image).set_mouse_pressed_fn(_plane_pressed)
             return
 
@@ -785,6 +812,7 @@ class ClayersPanel:
             def _group_pressed(_x: float, _y: float, button: int, _m: int) -> None:
                 if button == 0:
                     _group_click()
+
             cast(Any, image).set_mouse_pressed_fn(_group_pressed)
             return
 
@@ -807,6 +835,7 @@ class ClayersPanel:
                 )
                 ui.Spacer()
             return image
+
         return self._cell(cell_width, _make, centered=centered)
 
     # IS THIS GROUP ID CURRENTLY THE ACTIVE SIBLING UNDER ITS PARENT?
@@ -815,6 +844,8 @@ class ClayersPanel:
             return False
         groups = GroupRegistry.get()
         return bool(groups.is_active(group_id)) if groups is not None else False
+
+    # --- SELECTION AND GROUP ACTIONS ---
 
     # TRUE IF THIS USD PATH BELONGS TO A GROUP (OR NESTED PARENT GROUP)
     # WHOSE OWN LOCK FLAG IS SET. ITEMS INSIDE A LOCKED GROUP MUST NOT
@@ -854,9 +885,9 @@ class ClayersPanel:
         gids: list[str] = []
         for key in self._selected_row_keys:
             if key.startswith("path:"):
-                paths.append(key[len("path:"):])
+                paths.append(key[len("path:") :])
             elif key.startswith("group:"):
-                gids.append(key[len("group:"):])
+                gids.append(key[len("group:") :])
         return paths, gids
 
     # PUSH THE C_LAYERS ROW SELECTION TO THE USD STAGE. PATH-ROWS SELECT

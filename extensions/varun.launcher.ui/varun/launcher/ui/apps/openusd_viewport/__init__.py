@@ -4,6 +4,7 @@ Re-exports the public API so existing callers can keep importing from
 ``..apps.openusd_viewport`` after the module was split into a package.
 """
 
+# Expose this package's public classes and helpers.
 from .openusd_viewport import OpenUsdViewportManager
 from .tab import DEFAULT_LIGHT_RIG, FIRST_VIEWPORT_TITLE, ViewportDockCallback
 

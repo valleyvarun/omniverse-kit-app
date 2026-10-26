@@ -9,5 +9,21 @@
 # its affiliates is strictly prohibited.
 
 # run startup tests first
-from .test_app_startup import *
-from .test_app_extensions import *
+# Import test cases for Kit test discovery.
+from typing import Any as Any
+from typing import Tuple as Tuple
+from typing import cast as cast
+
+import carb as carb
+import omni as omni
+from omni.kit.test import AsyncTestCase as AsyncTestCase
+
+from .test_app_extensions import (
+    TestUSDComposerExtensions as TestUSDComposerExtensions,
+)
+from .test_app_startup import (
+    TestAppStartup as TestAppStartup,
+)
+
+# Public names retained from the original package exports.
+__all__ = ["Any", "AsyncTestCase", "TestAppStartup", "TestUSDComposerExtensions", "Tuple", "carb", "cast", "omni"]

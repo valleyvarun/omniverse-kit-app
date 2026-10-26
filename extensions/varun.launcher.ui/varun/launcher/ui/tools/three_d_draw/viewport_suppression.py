@@ -6,20 +6,32 @@ relevant manipulator layers and override the corresponding carb setting
 on `enter()`, then restore everything on `exit()`.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.settings
 
+# Local imports
 from .tool_settings import UNSET, VIEWPORT_CONTEXT_MENU_SETTING
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
 
+# ----------------------------------------------------------------------
+# 2. VIEWPORT SUPPRESSION
+# ----------------------------------------------------------------------
+
+
 class ViewportSuppression:
+    # Track viewport visibility and menu settings for later restoration.
     def __init__(self) -> None:
         # (layer, prior_visibility) entries, restored in reverse on exit.
         self._hidden_layers: list[tuple[Any, bool]] = []
@@ -65,9 +77,7 @@ class ViewportSuppression:
                         layer.visible = False
                         self._hidden_layers.append((layer, prev_visible))
                     except Exception as exc:
-                        LOGGER.warning(
-                            "3D Draw: could not hide %s layer: %s", layer_name, exc
-                        )
+                        LOGGER.warning("3D Draw: could not hide %s layer: %s", layer_name, exc)
 
         # Override the viewport context-menu setting and remember the prior value.
         try:
@@ -99,9 +109,7 @@ class ViewportSuppression:
                     except Exception:
                         settings.set_bool(VIEWPORT_CONTEXT_MENU_SETTING, True)
                 else:
-                    settings.set_bool(
-                        VIEWPORT_CONTEXT_MENU_SETTING, bool(self._prev_context_menu)
-                    )
+                    settings.set_bool(VIEWPORT_CONTEXT_MENU_SETTING, bool(self._prev_context_menu))
             except Exception as exc:
                 LOGGER.warning("3D Draw: could not restore context menu setting: %s", exc)
         self._prev_context_menu = UNSET

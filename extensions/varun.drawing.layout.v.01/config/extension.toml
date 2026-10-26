@@ -1,0 +1,17 @@
+[package]
+title = "3D Drawing Layout"
+version = "1.0.0"
+description = "Toolbox left, a permanent viewport center, and cLayers above Stage on the right."
+category = "Layout"
+readme = "docs/README.md"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.actions.core" = {}
+"varun.launcher.usd_viewport.v.01" = {}
+"varun.launcher.tool_box.v.01" = {}
+"varun.launcher.clayers.v.01" = {}
+"omni.kit.window.stage" = {}
+
+[[python.module]]
+name = "drawing_layout"

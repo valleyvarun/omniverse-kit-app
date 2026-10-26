@@ -1,3 +1,4 @@
+# Python & library imports
 from __future__ import annotations
 
 import logging
@@ -5,8 +6,12 @@ import weakref
 from dataclasses import dataclass, field
 from typing import Any, Callable, cast
 
+# Omniverse & USD imports
 import omni.ui as ui
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +37,7 @@ _TOOL_BUTTON_STYLE = {
     "Button:hovered": {"background_color": 0xFF3A3A3A},
     "Button:pressed": {"background_color": 0xFF555555},
     "Button:selected": {
-        "background_color": 0xFF1B6FB8,    # NVIDIA-ish accent blue.
+        "background_color": 0xFF1B6FB8,  # NVIDIA-ish accent blue.
         "border_color": 0xFF66B0FF,
     },
     "Button.Label": {
@@ -51,15 +56,20 @@ _TOOL_BUTTON_STYLE = {
 }
 
 
+# ----------------------------------------------------------------------
+# 2. DATA STRUCTURE: TOOL
+# ----------------------------------------------------------------------
+
+
 # Generic launcher tool descriptor.
 # eq=False keeps default identity-based __eq__/__hash__ so instances are
 # hashable (required for storing them in `_ACTIVE_REGISTRY`, a WeakSet).
 @dataclass(eq=False)
 class Tool:
     name: str
-    icon: str | None = None              # Path to the tool's icon image (optional).
-    icon_text: str | None = None         # Short text label shown when no icon image is provided.
-    shortcut: str | None = None          # Hotkey string, e.g. "C" or "CTRL + S".
+    icon: str | None = None  # Path to the tool's icon image (optional).
+    icon_text: str | None = None  # Short text label shown when no icon image is provided.
+    shortcut: str | None = None  # Hotkey string, e.g. "C" or "CTRL + S".
     tooltip: str | None = None
     on_click: Callable[[], None] | None = None
     enabled: bool = True
@@ -81,10 +91,12 @@ class Tool:
     # update its selected state without the caller having to track the widget.
     _button: ui.Button | None = field(default=None, init=False, repr=False, compare=False)
 
+    # Register toggleable tools for mutual exclusion.
     def __post_init__(self) -> None:
         if self.toggleable:
             _ACTIVE_REGISTRY.add(self)
 
+    # Run the tool callback when the tool is enabled.
     def activate(self) -> None:
         if self.enabled and self.on_click is not None:
             self.on_click()

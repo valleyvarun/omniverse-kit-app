@@ -1,10 +1,15 @@
-
+# Python & library imports
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.ext
 import omni.kit.actions.core
 import omni.kit.menu.utils
 from omni.kit.menu.utils import MenuItemDescription
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # extension that owns the layout action
 LAYOUT_ACTION_EXTENSION_ID = "varun.launcher.layout.v.01"
@@ -19,14 +24,18 @@ ACTIONS = cast(Any, omni.kit.actions.core)
 MENU_UTILS = cast(Any, omni.kit.menu.utils)
 
 
-class MyExtension(omni.ext.IExt):
+# ----------------------------------------------------------------------
+# 2. MAIN EXTENSION CLASS
+# ----------------------------------------------------------------------
 
+
+class MyExtension(omni.ext.IExt):
     # ON STARTUP
-    def on_startup(self, _ext_id: str):
+    def on_startup(self, _ext_id: str) -> None:
         print("[varun.launcher.custom_menu.v.01] Extension startup")
 
         # add reset option to Window menu
-        self._window_menu_items = [
+        self._window_menu_items: list[MenuItemDescription] = [
             MenuItemDescription(
                 name="Reset to Default Layout",
                 onclick_fn=self._reset_default_layout,
@@ -35,14 +44,14 @@ class MyExtension(omni.ext.IExt):
         MENU_UTILS.add_menu_items(self._window_menu_items, name="Window")
 
     # run layout reset action
-    def _reset_default_layout(self):
+    def _reset_default_layout(self) -> None:
         ACTIONS.execute_action(
             LAYOUT_ACTION_EXTENSION_ID,
             RESET_LAYOUT_ACTION_ID,
         )
 
     # ON SHUTDOWN
-    def on_shutdown(self):
+    def on_shutdown(self) -> None:
         print("[varun.launcher.custom_menu.v.01] Extension shutdown")
 
         # remove custom menu items

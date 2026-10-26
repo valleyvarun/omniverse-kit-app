@@ -1,0 +1,16 @@
+[package]
+title = "Explorer"
+version = "1.0.0"
+description = "Browse a project folder and create files and folders."
+category = "Launcher"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.client" = {}
+"omni.kit.window.filepicker" = {}
+
+[[python.module]]
+name = "explorer"
+
+[[test]]
+dependencies = ["omni.kit.test", "omni.kit.ui_test"]

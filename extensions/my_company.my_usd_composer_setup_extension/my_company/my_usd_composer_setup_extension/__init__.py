@@ -7,4 +7,5 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 
-from .extension import CreateSetupExtension
+# Expose the extension entry point to Kit.
+from .extension import CreateSetupExtension as CreateSetupExtension

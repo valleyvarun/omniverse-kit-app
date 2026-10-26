@@ -1,0 +1,21 @@
+[package]
+title = "Communication Layers"
+version = "1.0.0"
+description = "Drawing planes, strokes, and communication groups for the active workspace stage."
+category = "Launcher"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.usd" = {}
+"omni.kit.widget.layers" = {}
+"omni.kit.window.stage" = {}
+"varun.launcher.tool_box.v.01" = {}
+
+[[python.module]]
+name = "clayers"
+
+[settings]
+exts."varun.launcher.clayers.v.01".showUsdLayers = true
+
+[[test]]
+dependencies = ["omni.kit.test", "omni.kit.ui_test"]

@@ -1,0 +1,18 @@
+[package]
+title = "Command Line"
+version = "1.0.0"
+description = "Launcher commands with persistent keyboard entry."
+category = "Launcher"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.actions.core" = {}
+"omni.kit.hotkeys.core" = {}
+"varun.launcher.workspace.v.01" = {}
+"varun.launcher.home.v.01" = {}
+
+[[python.module]]
+name = "command_line"
+
+[[test]]
+dependencies = ["omni.kit.test", "omni.kit.ui_test"]

@@ -8,5 +8,32 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from .test_benchmarks import *
-from .test_hello import *
+# Import test cases for Kit test discovery.
+import asyncio as asyncio
+from importlib import import_module as import_module
+
+import omni as omni
+from omni.kit.test import AsyncTestCase as AsyncTestCase
+from omni.kit.test import BenchmarkTestCase as BenchmarkTestCase
+
+from .test_benchmarks import (
+    TestBenchmarks as TestBenchmarks,
+)
+from .test_benchmarks import (
+    TestBenchmarksNoCustomMetric as TestBenchmarksNoCustomMetric,
+)
+from .test_hello import (
+    Test as Test,
+)
+
+# Public names retained from the original package exports.
+__all__ = [
+    "AsyncTestCase",
+    "BenchmarkTestCase",
+    "Test",
+    "TestBenchmarks",
+    "TestBenchmarksNoCustomMetric",
+    "asyncio",
+    "import_module",
+    "omni",
+]

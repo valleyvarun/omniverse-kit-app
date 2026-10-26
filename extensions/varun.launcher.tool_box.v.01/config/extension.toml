@@ -1,0 +1,38 @@
+# ----------------------------------------------------------------------
+# 1. PACKAGE DETAILS
+# ----------------------------------------------------------------------
+[package]
+title = "varun_launcher_tool_box_v_01"
+version = "01"
+description = "Dockable transform and drawing tools for Kit viewports."
+category = "Tools"
+keywords = ["tools", "viewport", "transform", "drawing"]
+readme = "docs/README.md"
+
+# ----------------------------------------------------------------------
+# 2. KIT DEPENDENCIES
+# ----------------------------------------------------------------------
+[dependencies]
+"omni.appwindow" = {}
+"omni.ui" = {}
+"omni.usd" = {}
+"omni.kit.commands" = {}
+"omni.kit.actions.core" = {}
+"omni.kit.hotkeys.core" = {}
+"omni.kit.menu.utils" = {}
+"omni.kit.viewport.registry" = {}
+"omni.kit.viewport.utility" = {}
+"omni.kit.viewport.window" = {}
+"omni.kit.scene_view.opengl" = {}
+"omni.kit.manipulator.prim" = {}
+"omni.kit.manipulator.selection" = {}
+"omni.kit.pip_archive" = {}
+
+# ----------------------------------------------------------------------
+# 3. PYTHON ENTRY POINT
+# ----------------------------------------------------------------------
+[[python.module]]
+name = "tool_box"
+
+[[test]]
+dependencies = ["omni.kit.test", "omni.kit.ui_test"]

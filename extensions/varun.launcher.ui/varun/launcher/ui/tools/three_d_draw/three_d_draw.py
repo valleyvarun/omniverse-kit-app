@@ -1,4 +1,4 @@
-﻿"""3D Draw freehand-drawing tool (the toolbar entry point).
+"""3D Draw freehand-drawing tool (the toolbar entry point).
 
 Helper modules:
   - `brush_config.py`         singleton state (radius, listeners).
@@ -26,21 +26,27 @@ Architecture:
   - `deactivate()` reverses everything from `activate()`.
 """
 
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
 import numpy as np
+
+# Omniverse & USD imports
 import omni.kit.app
 import omni.usd
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade, Vt
 
+from ...active_context import get_active_stage, get_active_usd_context
+from ..tool import Tool
+
+# Local imports
 from .brush_config import BrushConfig
 from .cursor_3d import Cursor3D
 from .escape_handler import EscapeHandler
 from .stroke_resampler import resample_polyline
-from ...active_context import get_active_stage, get_active_usd_context
 from .tool_settings import (
     CHUNK_SPHERE_LIMIT,
     DRAW_ROOT,
@@ -52,10 +58,17 @@ from .tool_settings import (
     SPHERE_COLOR,
 )
 from .viewport_suppression import ViewportSuppression
-from ..tool import Tool
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
+
+
+# ----------------------------------------------------------------------
+# 2. THREE DDRAW TOOL
+# ----------------------------------------------------------------------
 
 
 class ThreeDDrawTool:
@@ -65,6 +78,7 @@ class ThreeDDrawTool:
     TOOLTIP = "3D Draw"
     ICON_NAME = "3d_draw.svg"
 
+    # Prepare cursor, stroke samples, and live point-chunk state.
     def __init__(self) -> None:
         self._tool: Tool | None = None
         self._is_active = False
@@ -101,6 +115,8 @@ class ThreeDDrawTool:
         self._escape = EscapeHandler()
         # Listener cb subscribed on BrushConfig while the tool is active.
         self._brush_listener: Any = None
+
+    # --- TOOL BUTTON AND ACTIVATION ---
 
     # BUILD THE TOOLBAR TOOL DESCRIPTOR.
     def make_tool(self) -> Tool:
@@ -207,6 +223,8 @@ class ThreeDDrawTool:
 
     # ----- Drawing (sphere emission while LMB held) -----
 
+    # --- STROKE INPUT ---
+
     # CURSOR LMB-DOWN: START A NEW STROKE AND EMIT THE FIRST STAMP.
     def _on_draw_begin(self, pos: tuple[float, float, float]) -> None:
         self._draw_pos = pos
@@ -263,6 +281,7 @@ class ThreeDDrawTool:
         if stroke_path:
             try:
                 from ...layers.layers import GroupRegistry
+
                 registry = GroupRegistry.get()
                 if registry is not None:
                     registry.assign_new_stroke(stroke_path)
@@ -275,6 +294,8 @@ class ThreeDDrawTool:
         self._last_stamp_pos = None
         self._stamp_carry = 0.0
         self._stop_emitting()
+
+    # --- FRAME UPDATES AND STAMP EMISSION ---
 
     # SUBSCRIBE TO PER-FRAME UPDATES SO _TICK RUNS WHILE DRAWING.
     def _start_emitting(self) -> None:
@@ -341,7 +362,9 @@ class ThreeDDrawTool:
             # Resample the polyline into uniformly spaced stamps.
             spacing = float(BrushConfig.get().stamp_spacing)
             stamps, self._last_stamp_pos, self._stamp_carry = resample_polyline(
-                polyline, spacing, self._stamp_carry,
+                polyline,
+                spacing,
+                self._stamp_carry,
                 self._last_stamp_pos is None,
             )
 
@@ -387,6 +410,8 @@ class ThreeDDrawTool:
             self._positions = new_buf
         self._positions[n:needed] = new_arr
         self._count = needed
+
+    # --- USD POINTS AND MATERIALS ---
 
     # Create the temp Xform parents that hold the live stroke's chunks.
     # No shared prototype is needed -- each chunk is a self-contained
@@ -473,9 +498,7 @@ class ThreeDDrawTool:
         # Defaults from FlatPoints.mdl are fine (use_display_color=true,
         # convert_srgb_to_linear=true, intensity_scale=5000) -- displayColor
         # on each Points prim drives the rendered color.
-        material.CreateSurfaceOutput("mdl").ConnectToSource(
-            shader.ConnectableAPI(), "out"
-        )
+        material.CreateSurfaceOutput("mdl").ConnectToSource(shader.ConnectableAPI(), "out")
         return material
 
     # Push the active chunk's slice (buffer[_chunk_buf_start:_count]) into
@@ -499,9 +522,7 @@ class ThreeDDrawTool:
             points = cast(Any, UsdGeom).Points(prim)
             with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):
                 buf = self._positions[start:end]
-                points.GetPointsAttr().Set(
-                    cast(Any, Vt).Vec3fArray.FromNumpy(buf)
-                )
+                points.GetPointsAttr().Set(cast(Any, Vt).Vec3fArray.FromNumpy(buf))
         except Exception as exc:
             LOGGER.warning("3D Draw: failed to write chunk points: %s", exc)
 
@@ -514,6 +535,8 @@ class ThreeDDrawTool:
             return
         self._chunk_paths.append(new_chunk)
         self._chunk_buf_start = self._count
+
+    # --- STROKE FINALIZATION AND CLEANUP ---
 
     # Collapse all chunks into a single final UsdGeom.Points prim at the
     # next available `Stroke_NN` path. Returns the final stroke path, or
@@ -529,9 +552,7 @@ class ThreeDDrawTool:
             with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):
                 points = self._define_points_prim(stage, stroke_path)
                 buf = self._positions[: self._count]
-                points.GetPointsAttr().Set(
-                    cast(Any, Vt).Vec3fArray.FromNumpy(buf)
-                )
+                points.GetPointsAttr().Set(cast(Any, Vt).Vec3fArray.FromNumpy(buf))
             return stroke_path
         except Exception as exc:
             LOGGER.warning("3D Draw: failed to finalize stroke: %s", exc)

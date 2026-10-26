@@ -1,3 +1,4 @@
+# Python & library imports
 import asyncio
 import logging
 from pathlib import Path
@@ -8,13 +9,13 @@ import omni.ext
 # Launcher window and tool imports.
 from .active_context import install_global_context_shim, uninstall_global_context_shim
 from .kit_panels.kit_panel_rebinder import KitPanelRebinder
+from .layers.layers import GroupRegistry, LayerRegistry, VisibilityManager
+from .layers.stage import StageLockColumn
 from .startup.hotkeys import HotkeyManager
 from .startup.layout_docking import LayoutDocking
 from .startup.render_mode import RenderModeMenu
 from .startup.startup_defaults import StartupDefaults
 from .tools.hud.hud_toggle_button import HudToggleButton
-from .tools.three_d_draw.drawing_plane import PlaneGridManager
-from .layers.layers import GroupRegistry, LayerRegistry, VisibilityManager
 from .tools.selection.selection import (
     LockManager,
     SelectionDirectionFilter,
@@ -22,7 +23,7 @@ from .tools.selection.selection import (
     SelectionSync,
     ViewportXformFilter,
 )
-from .layers.stage import StageLockColumn
+from .tools.three_d_draw.drawing_plane import PlaneGridManager
 from .tools.tool_properties import ToolPropertiesWindow
 from .windows.bottom_window import BottomWindow
 from .windows.left_window import LeftWindow
@@ -30,14 +31,23 @@ from .windows.main_window import MainWindow
 from .windows.right_window import ClayersWindow
 from .windows.top_window import TopWindow
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Module-level constants.
 LOGGER = logging.getLogger(__name__)
 EXTENSION_PATH = Path(__file__).resolve().parents[3]
 
 
+# ----------------------------------------------------------------------
+# 2. MAIN EXTENSION CLASS
+# ----------------------------------------------------------------------
+
+
 # Launcher extension entry point.
 class MyExtension(omni.ext.IExt):
+    # Track extension-owned windows, tools, and service handles.
     def __init__(self) -> None:
         super().__init__()
         # Window and tool instances.
@@ -68,11 +78,15 @@ class MyExtension(omni.ext.IExt):
     def on_startup(self, ext_id: str) -> None:
         print(f"[{ext_id}] startup")
 
+        # --- 1) PREPARE STARTUP DEFAULTS ---
+
         # Set up startup defaults (layout, stage, light rig, pacing presets).
         layout_file = str(EXTENSION_PATH / "layouts" / "default.json")
         self._startup_defaults = StartupDefaults(layout_file)
         StartupDefaults.add_fps_pacing_preset(15)
         StartupDefaults.add_fps_pacing_preset(30)
+
+        # --- 2) INSTALL DOCK AND SELECTION BEHAVIOR ---
 
         # Apply visual tweaks.
         self._layout_docking = LayoutDocking(self._startup_defaults)
@@ -85,6 +99,8 @@ class MyExtension(omni.ext.IExt):
         self._viewport_xform_filter.apply()
         self._selection_sync = SelectionSync()
         self._selection_sync.apply()
+
+        # --- 3) INSTALL LAYER, GROUP, AND LOCK MANAGERS ---
 
         # Add a Lock column to the Stage window with full enforcement.
         self._lock_manager = LockManager()
@@ -104,6 +120,8 @@ class MyExtension(omni.ext.IExt):
         self._stage_lock_column = StageLockColumn(self._lock_manager)
         self._stage_lock_column.apply()
 
+        # --- 4) CREATE THE LAUNCHER WINDOWS ---
+
         # Build all docked windows.
         self._top_window = TopWindow()
         self._left_window = LeftWindow()
@@ -111,6 +129,8 @@ class MyExtension(omni.ext.IExt):
         self._bottom_window = BottomWindow()
         self._tool_properties_window = ToolPropertiesWindow()
         self._main_window = MainWindow()
+
+        # --- 5) ADD HUD CONTROLS AND RESTORE THE LAYOUT ---
 
         # Register the viewport HUD toggle button.
         self._hud_toggle_button = HudToggleButton()
@@ -120,12 +140,16 @@ class MyExtension(omni.ext.IExt):
         # viewport (including the first one) goes through the same path.
         asyncio.ensure_future(self._startup_defaults.initialize_layout())
 
+        # --- 6) REGISTER MENUS AND HOTKEYS ---
+
         # Add menu entries and hotkeys.
         self._layout_docking.add_window_menu_items()
         self._render_mode_menu = RenderModeMenu()
         self._render_mode_menu.register()
         self._hotkey_manager = HotkeyManager(lambda: self._top_window)
         self._hotkey_manager.register()
+
+        # --- 7) ROUTE KIT PANELS TO THE ACTIVE TAB ---
 
         # Reroute Kit-owned panels (right-click Create / File menu / Stage
         # tree / Property panel / etc.) so unnamed `omni.usd.get_context()`
@@ -149,6 +173,8 @@ class MyExtension(omni.ext.IExt):
     def on_shutdown(self) -> None:
         print("[varun.launcher.ui] shutdown")
 
+        # --- 1) RESTORE CONTEXT ROUTING ---
+
         # Restore the original `omni.usd.get_context` first so anything
         # that tears down during shutdown sees the unpatched API.
         uninstall_global_context_shim()
@@ -156,6 +182,8 @@ class MyExtension(omni.ext.IExt):
         if self._kit_panel_rebinder is not None:
             self._kit_panel_rebinder.destroy()
             self._kit_panel_rebinder = None
+
+        # --- 2) REMOVE HOTKEYS AND MENU ENTRIES ---
 
         if self._hotkey_manager is not None:
             self._hotkey_manager.deregister()
@@ -168,6 +196,8 @@ class MyExtension(omni.ext.IExt):
         if self._layout_docking is not None:
             self._layout_docking.remove_window_menu_items()
             self._layout_docking = None
+
+        # --- 3) RELEASE SELECTION AND LAYER SERVICES ---
 
         if self._selection_style is not None:
             self._selection_style.destroy()
@@ -208,6 +238,8 @@ class MyExtension(omni.ext.IExt):
         if self._lock_manager is not None:
             self._lock_manager.destroy()
             self._lock_manager = None
+
+        # --- 4) DESTROY CONTROLS AND WINDOWS ---
 
         if self._hud_toggle_button:
             self._hud_toggle_button.destroy()

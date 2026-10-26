@@ -18,8 +18,10 @@ Home + viewport windows themselves are created with
 own.
 """
 
+# Python & library imports
 from typing import Any, Callable, cast
 
+# Local imports
 from ..active_context import (
     HOME_CONTEXT_NAME,
     ensure_home_context,
@@ -30,15 +32,24 @@ from ..startup.home import HomeWindow
 from .destinations.apps_window import AppsWindow
 from .main_tabs_window import MainTabsWindow
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Tab identifier for the Home page (viewport tab names are owned by the
 # OpenUsdViewportManager).
 TAB_HOME = "Home"
 
 
+# ----------------------------------------------------------------------
+# 2. MAIN WINDOW
+# ----------------------------------------------------------------------
+
+
 class MainWindow:
     """Stitches Home + per-app tabs into the main dock slot."""
 
+    # Create Home, the shared viewport manager, and the tab strip.
     def __init__(self) -> None:
         # Home is not a viewport -- it has no stage. We still bind it to a
         # dedicated empty UsdContext so Kit-owned panels that follow the
@@ -59,9 +70,7 @@ class MainWindow:
         # default viewport. The layout JSON marks Home as
         # `selected_in_dock: true` and Viewport as `false`, so Home
         # wins on startup with no extra focus juggling needed.
-        self._home_window: HomeWindow | None = HomeWindow(
-            on_logo_clicked=self._on_home_logo_clicked
-        )
+        self._home_window: HomeWindow | None = HomeWindow(on_logo_clicked=self._on_home_logo_clicked)
         self._viewports = OpenUsdViewportManager(
             on_dock_changed=self._on_viewport_dock,
             on_tab_renamed=self._on_viewport_tab_renamed,
@@ -85,6 +94,7 @@ class MainWindow:
         # OpenUsdViewportManager via _on_viewport_dock.
         home_window = self._home_window.window
         if home_window is not None:
+
             def _on_home_dock(is_selected: bool) -> None:
                 self._on_dock_changed(TAB_HOME, bool(is_selected))
 
@@ -92,6 +102,7 @@ class MainWindow:
 
     # PUBLIC API ----------------------------------------------------------
 
+    # Return the currently selected tab name.
     @property
     def active_tab(self) -> str:
         return self._active_tab
@@ -100,15 +111,18 @@ class MainWindow:
         """Subscribe to active-tab changes. Callback receives the new tab name."""
         self._on_active_tab_changed.append(callback)
 
+    # Remove a tab-change callback if registered.
     def remove_active_tab_listener(self, callback: Callable[[str], None]) -> None:
         if callback in self._on_active_tab_changed:
             self._on_active_tab_changed.remove(callback)
 
     # INTERNAL ------------------------------------------------------------
 
+    # Forward viewport selection to the shared tab handler.
     def _on_viewport_dock(self, name: str, is_selected: bool) -> None:
         self._on_dock_changed(name, is_selected)
 
+    # Keep the active title and tab strip in sync with file names.
     def _on_viewport_tab_renamed(self, old_name: str, new_name: str) -> None:
         # A viewport tab was saved to (or opened from) a file, so its
         # label changes from "Viewport N" to the file name. Keep our
@@ -118,6 +132,7 @@ class MainWindow:
         if self._main_tabs is not None:
             self._main_tabs.rename_tab(old_name, new_name)
 
+    # Update the active context, tab highlight, and listeners.
     def _on_dock_changed(self, tab: str, is_selected: bool) -> None:
         if not is_selected:
             # Only fire on the tab that just became active.
@@ -149,6 +164,7 @@ class MainWindow:
 
     # TAB BAR DISPATCH ----------------------------------------------------
 
+    # Select and focus the Home window.
     def _focus_home_now(self) -> None:
         home = self._home_window.window if self._home_window is not None else None
         if home is None:
@@ -162,6 +178,7 @@ class MainWindow:
         except Exception:
             pass
 
+    # Focus Home or the requested viewport tab.
     def _on_tab_button_clicked(self, name: str) -> None:
         # User clicked one of the buttons in the fake tab bar. Focus the
         # matching pane; the dock-changed callback then propagates back
@@ -182,6 +199,7 @@ class MainWindow:
         # Otherwise it's a viewport tab.
         self._viewports.focus_tab(name)
 
+    # Remove a viewport tab only after its close request is confirmed.
     def _on_tab_close_clicked(self, name: str) -> None:
         # User clicked the X overlay on a (closable) tab. Home is
         # added with ``closable=False`` so it never reaches us, but
@@ -201,12 +219,11 @@ class MainWindow:
                 self._main_tabs.remove_tab(name)
 
         # Dirty stage -> Save / Don't Save / Cancel prompt; clean -> close now.
-        self._viewports.close_viewport_with_prompt(
-            name, on_confirmed=_on_confirmed
-        )
+        self._viewports.close_viewport_with_prompt(name, on_confirmed=_on_confirmed)
 
     # LIFECYCLE -----------------------------------------------------------
 
+    # Release listeners, destination popups, tabs, and viewports.
     def destroy(self) -> None:
         self._on_active_tab_changed.clear()
         if self._apps_window is not None:
@@ -222,6 +239,7 @@ class MainWindow:
 
     # HOME LOGO DISPATCH --------------------------------------------------
 
+    # Create and show the Apps popup when requested.
     def _on_home_logo_clicked(self, label: str) -> None:
         if label == "Apps":
             if self._apps_window is None:
@@ -230,6 +248,7 @@ class MainWindow:
 
     # APPS POPUP DISPATCH -------------------------------------------------
 
+    # Create and select a viewport tab for the OpenUSD app.
     def _on_app_clicked(self, label: str) -> None:
         if label == "OpenUSD":
             title = self._viewports.spawn_new_tab()

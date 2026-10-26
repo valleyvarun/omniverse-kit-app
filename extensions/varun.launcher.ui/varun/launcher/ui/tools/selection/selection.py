@@ -1,18 +1,25 @@
-﻿from __future__ import annotations
+# Python & library imports
+from __future__ import annotations
 
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.usd
 
-# Re-export LockManager from its new central home so existing imports keep
-# working. All lock/visibility/active-plane state lives in `layers.py`.
-from ...layers.layers import LockManager
 from ...active_context import (
     add_active_context_listener,
     get_active_usd_context,
     remove_active_context_listener,
 )
+
+# Re-export LockManager from its new central home so existing imports keep
+# working. All lock/visibility/active-plane state lives in `layers.py`.
+from ...layers.layers import LockManager
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 __all__ = [
     "LockManager",
@@ -32,8 +39,14 @@ _INNER_COLOR = (0.35, 0.35, 0.35, 0.30)
 _THICKNESS = 2.0
 
 
+# ----------------------------------------------------------------------
+# 2. SELECTION STYLE
+# ----------------------------------------------------------------------
+
+
 # Recolours the viewport drag-select rectangle.
 class SelectionStyle:
+    # Track the original selection-manipulator constructor.
     def __init__(self) -> None:
         self._patched = False
         self._original_init: Any = None
@@ -58,6 +71,7 @@ class SelectionStyle:
             return
         try:
             from omni.kit.manipulator.selection import SelectionManipulator
+
             if self._original_init is not None:
                 cast(Any, SelectionManipulator).__init__ = self._original_init
         except Exception:
@@ -137,8 +151,14 @@ class SelectionStyle:
             LOGGER.warning("SelectionStyle: could not restyle manipulator: %s", exc)
 
 
+# ----------------------------------------------------------------------
+# 3. SELECTION DIRECTION FILTER
+# ----------------------------------------------------------------------
+
+
 # Râ†’L drag = enclose-only (custom selection). Lâ†’R = touch-select (kit default).
 class SelectionDirectionFilter:
+    # Track original handlers and box-selection drag state.
     def __init__(self) -> None:
         self._patched: bool = False
         self._original_handle: Any = None
@@ -151,7 +171,9 @@ class SelectionDirectionFilter:
         if self._patched:
             return
         try:
-            from omni.kit.viewport.window.manipulator.selection import SelectionManipulatorItem
+            from omni.kit.viewport.window.manipulator.selection import (
+                SelectionManipulatorItem,
+            )
         except ImportError as exc:
             LOGGER.warning("SelectionDirectionFilter: viewport selection unavailable: %s", exc)
             return
@@ -170,8 +192,13 @@ class SelectionDirectionFilter:
                 sx, ex = float(start[0]), float(end[0])
                 sy, ey = float(start[1]), float(end[1])
                 outer._last_drag = (
-                    min(sx, ex), min(sy, ey), max(sx, ex), max(sy, ey),
-                    ex > sx, viewport_api, mode,
+                    min(sx, ex),
+                    min(sy, ey),
+                    max(sx, ex),
+                    max(sy, ey),
+                    ex > sx,
+                    viewport_api,
+                    mode,
                 )
             except Exception:
                 outer._last_drag = None
@@ -208,7 +235,10 @@ class SelectionDirectionFilter:
         if not self._patched:
             return
         try:
-            from omni.kit.viewport.window.manipulator.selection import SelectionManipulatorItem
+            from omni.kit.viewport.window.manipulator.selection import (
+                SelectionManipulatorItem,
+            )
+
             cls_any = cast(Any, SelectionManipulatorItem)
             if self._original_handle is not None:
                 cls_any._SelectionManipulatorItem__handle_selection = self._original_handle
@@ -220,6 +250,8 @@ class SelectionDirectionFilter:
         self._original_request = None
         self._last_drag = None
         self._patched = False
+
+    # --- BOX-SELECTION GEOMETRY ---
 
     # Walk the stage and select prims whose world AABB is fully inside the NDC rect.
     def _select_enclosed(
@@ -282,6 +314,7 @@ class SelectionDirectionFilter:
         selection = usd_context.get_selection()
         try:
             from omni.kit.manipulator.selection import SelectionMode
+
             mode_replace = mode == SelectionMode.REPLACE
             mode_remove = mode == SelectionMode.REMOVE
         except Exception:
@@ -323,9 +356,15 @@ class SelectionDirectionFilter:
             self._collect_enclosed(child, fully_enclosed, out)
 
 
+# ----------------------------------------------------------------------
+# 4. VIEWPORT XFORM FILTER
+# ----------------------------------------------------------------------
+
+
 # Strips Xform prims from selections that originated in the 3D viewport.
 # Stage-window picks are unaffected.
 class ViewportXformFilter:
+    # Track transform hooks and the stage subscription.
     def __init__(self) -> None:
         self._patched = False
         self._original_request: Any = None
@@ -339,7 +378,9 @@ class ViewportXformFilter:
         if self._patched:
             return
         try:
-            from omni.kit.viewport.window.manipulator.selection import SelectionManipulatorItem
+            from omni.kit.viewport.window.manipulator.selection import (
+                SelectionManipulatorItem,
+            )
         except ImportError as exc:
             LOGGER.warning("ViewportXformFilter: viewport selection unavailable: %s", exc)
             return
@@ -380,7 +421,10 @@ class ViewportXformFilter:
         if not self._patched:
             return
         try:
-            from omni.kit.viewport.window.manipulator.selection import SelectionManipulatorItem
+            from omni.kit.viewport.window.manipulator.selection import (
+                SelectionManipulatorItem,
+            )
+
             cls_any = cast(Any, SelectionManipulatorItem)
             if self._original_request is not None:
                 cls_any._SelectionManipulatorItem__request_pick = self._original_request
@@ -389,6 +433,8 @@ class ViewportXformFilter:
         self._original_request = None
         self._patched = False
         self._pick_pending = False
+
+    # --- EXPAND TRANSFORM TARGETS TO MESHES ---
 
     # Filter Xforms out of the next SELECTION_CHANGED after a viewport pick.
     def _on_stage_event(self, event: Any) -> None:
@@ -442,6 +488,7 @@ class ViewportXformFilter:
         results: list[str] = []
         try:
             from pxr import UsdGeom
+
             for descendant in prim.GetAllChildren():
                 self._gather_meshes(descendant, UsdGeom, results)
         except Exception:
@@ -466,6 +513,11 @@ class ViewportXformFilter:
             self._gather_meshes(child, UG, out)
 
 
+# ----------------------------------------------------------------------
+# 5. SELECTION SYNC
+# ----------------------------------------------------------------------
+
+
 # Two-way bridge between the USD stage selection and the C_Layers panel.
 # Subscribers (e.g. the C_Layers panel) get notified whenever the stage
 # selection changes; they can also push their own selection back to the
@@ -473,20 +525,24 @@ class ViewportXformFilter:
 class SelectionSync:
     _instance: "SelectionSync | None" = None
 
+    # Track selection listeners and the stage subscription.
     def __init__(self) -> None:
         self._stage_sub: Any = None
         self._listeners: list[Any] = []
         self._pushing = False
 
+    # Return the shared manager instance.
     @classmethod
     def get(cls) -> "SelectionSync | None":
         return cls._instance
 
+    # Install the shared selection service and context listener.
     def apply(self) -> None:
         SelectionSync._instance = self
         self._subscribe()
         add_active_context_listener(self._on_active_context_changed)
 
+    # Listen for selection events in the active context.
     def _subscribe(self) -> None:
         try:
             ctx = get_active_usd_context()
@@ -514,6 +570,7 @@ class SelectionSync:
             except Exception:
                 pass
 
+    # Release selection and context subscriptions.
     def destroy(self) -> None:
         remove_active_context_listener(self._on_active_context_changed)
         if self._stage_sub is not None:
@@ -524,6 +581,8 @@ class SelectionSync:
             self._stage_sub = None
         if SelectionSync._instance is self:
             SelectionSync._instance = None
+
+    # --- SHARED SELECTION ACCESS ---
 
     # CURRENT STAGE SELECTION AS A LIST OF USD PATHS.
     def current_paths(self) -> list[str]:
@@ -550,16 +609,19 @@ class SelectionSync:
         finally:
             self._pushing = False
 
+    # Register a callback for selection changes.
     def add_listener(self, callback: Any) -> None:
         if callback not in self._listeners:
             self._listeners.append(callback)
 
+    # Remove a previously registered callback.
     def remove_listener(self, callback: Any) -> None:
         try:
             self._listeners.remove(callback)
         except ValueError:
             pass
 
+    # Forward selection changes to registered listeners.
     def _on_stage_event(self, event: Any) -> None:
         try:
             if int(event.type) != int(omni.usd.StageEventType.SELECTION_CHANGED):

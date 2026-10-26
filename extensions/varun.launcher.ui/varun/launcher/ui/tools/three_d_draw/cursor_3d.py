@@ -1,18 +1,21 @@
+# Python & library imports
 from __future__ import annotations
 
 from typing import Any, Callable, cast
 
+# Omniverse & USD imports
 from omni.ui import scene as sc
 from pxr import Gf  # hoisted out of the per-mousemove raycast hot path
 
+from ...active_context import get_active_stage
+from ...layers.layers import DEFAULT_GROUND_PLANE_PATH, LayerRegistry
+
+# Local imports
 from .drawing_plane import PlaneRegistry
 from .tool_settings import (
     CURSOR_FACTORY_ID,
     RING_COLOR,
 )
-from ...layers.layers import DEFAULT_GROUND_PLANE_PATH, LayerRegistry
-from ...active_context import get_active_stage
-
 
 # ============================================================================
 # 3D viewport cursor that tracks the mouse on the active drawing plane,
@@ -24,6 +27,10 @@ from ...active_context import get_active_stage
 # in NDC so the ring tracks the OS cursor through render latency. The TRUE
 # world position (no lead) is what we report to brush callbacks, so strokes
 # stay accurate. On the very first sample we have no `last`, so no lead.
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Type aliases.
 WorldPos = tuple[float, float, float]
@@ -37,6 +44,11 @@ _active_scene: Any = None
 
 # Every live _CursorScene instance (one per viewport). hide() toggles them off.
 _scenes: set[Any] = set()
+
+
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
 
 
 # Build an orthonormal in-plane basis (right, up) given a unit normal. Together
@@ -59,15 +71,23 @@ def _basis_for_normal(normal: "Gf.Vec3d") -> "tuple[Gf.Vec3d, Gf.Vec3d]":
     return (right, up)
 
 
+# ----------------------------------------------------------------------
+# 3. CURSOR3 D
+# ----------------------------------------------------------------------
+
+
 # Public entry point: register/deregister the cursor scene with the viewport.
 class Cursor3D:
+    # Keep the cursor scene registration handle.
     def __init__(self) -> None:
         self._registration: Any = None
 
+    # Register the cursor scene and reveal retained scene instances.
     def show(self) -> None:
         if self._registration is not None:
             return
         from omni.kit.viewport.registry import RegisterScene
+
         self._registration = cast(Any, RegisterScene)(_CursorScene, CURSOR_FACTORY_ID)
         # Reactivate any previously hidden scenes the registry kept alive.
         for s in list(_scenes):
@@ -76,6 +96,7 @@ class Cursor3D:
             except Exception:
                 pass
 
+    # Hide cursor scenes and release their registration.
     def hide(self) -> None:
         for s in list(_scenes):
             try:
@@ -90,10 +111,12 @@ class Cursor3D:
             pass
         self._registration = None
 
+    # Return the most recently activated cursor scene.
     @staticmethod
     def get_scene() -> Any:
         return _active_scene
 
+    # Store callbacks for drag begin, movement, and completion.
     def set_listener(
         self,
         on_begin: DragCallback | None = None,
@@ -103,21 +126,31 @@ class Cursor3D:
         global _listener
         _listener = {"begin": on_begin, "change": on_change, "end": on_end}
 
+    # Disconnect the drawing callbacks.
     def clear_listener(self) -> None:
         global _listener
         _listener = None
 
+    # Read the current brush radius.
     @staticmethod
     def radius() -> float:
         from .brush_config import BrushConfig
+
         return BrushConfig.get().brush_radius
+
+
+# ----------------------------------------------------------------------
+# 4. CURSOR SCENE
+# ----------------------------------------------------------------------
 
 
 # Per-viewport scene that draws the brush ring + grid and routes mouse input.
 class _CursorScene:
+    # Create cursor visuals, gesture handlers, and plane tracking.
     def __init__(self, desc: dict[str, Any]) -> None:
         global _active_scene
         from .brush_config import BrushConfig
+
         self._viewport_api: Any = desc.get("viewport_api")
         self._up_axis = self._detect_up_axis()
         self._world_pos: WorldPos | None = None
@@ -148,8 +181,7 @@ class _CursorScene:
             with self._transform:
                 self._orient_transform = sc.Transform(transform=self._compute_orient_matrix())
                 with self._orient_transform:
-                    sc.Arc(radius=self._brush_radius, tesselation=64, wireframe=True,
-                           thickness=2.0, color=RING_COLOR)
+                    sc.Arc(radius=self._brush_radius, tesselation=64, wireframe=True, thickness=2.0, color=RING_COLOR)
             # Hover for cursor tracking; Drag (LMB) forwards to listener.
             self._hover_screen = sc.Screen(gesture=_Hover(self))
             self._drag_screen = sc.Screen(gesture=_Drag(self))
@@ -160,18 +192,22 @@ class _CursorScene:
         if registry is not None:
             registry.add_listener(self._layer_listener_cb)
 
+    # Register this scene as a viewport manipulator.
     @property
     def categories(self) -> tuple[str, ...]:
         return ("manipulator",)
 
+    # Return the scene registration name.
     @property
     def name(self) -> str:
         return "ThreeDDrawCursor"
 
+    # Read or update scene visibility.
     @property
     def visible(self) -> bool:
         return self._visible
 
+    # Read or update scene visibility.
     @visible.setter
     def visible(self, value: bool) -> None:
         self.set_visible(bool(value))
@@ -185,6 +221,7 @@ class _CursorScene:
         except Exception:
             pass
 
+    # Release the plane listener and cursor scene references.
     def destroy(self) -> None:
         global _active_scene
         if self._layer_listener_cb is not None:
@@ -202,9 +239,11 @@ class _CursorScene:
         self._orient_transform = None
         self._root = None
 
+    # Read the stage up axis, falling back to Y.
     def _detect_up_axis(self) -> str:
         try:
             from pxr import UsdGeom
+
             stage = get_active_stage(self._viewport_api)
             if stage is not None:
                 return str(cast(Any, UsdGeom).GetStageUpAxis(stage))
@@ -244,10 +283,22 @@ class _CursorScene:
     def _compute_orient_matrix(self) -> list[float]:
         right, up, normal = self._basis_r, self._basis_u, self._normal
         return [
-            float(cast(Any, right)[0]), float(cast(Any, right)[1]), float(cast(Any, right)[2]), 0.0,
-            float(cast(Any, up)[0]),    float(cast(Any, up)[1]),    float(cast(Any, up)[2]),    0.0,
-            float(cast(Any, normal)[0]), float(cast(Any, normal)[1]), float(cast(Any, normal)[2]), 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            float(cast(Any, right)[0]),
+            float(cast(Any, right)[1]),
+            float(cast(Any, right)[2]),
+            0.0,
+            float(cast(Any, up)[0]),
+            float(cast(Any, up)[1]),
+            float(cast(Any, up)[2]),
+            0.0,
+            float(cast(Any, normal)[0]),
+            float(cast(Any, normal)[1]),
+            float(cast(Any, normal)[2]),
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
         ]
 
     # LayerRegistry change hook -- re-derive basis + push fresh matrix.
@@ -286,22 +337,38 @@ class _CursorScene:
                 visual_p = pp
         self._last_ndc = mouse_ndc
         self._transform.transform = [
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            float(visual_p[0]), float(visual_p[1]), float(visual_p[2]), 1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            float(visual_p[0]),
+            float(visual_p[1]),
+            float(visual_p[2]),
+            1,
         ]
         return p
 
+    # Return the last unpredicted cursor position.
     @property
     def world_pos(self) -> WorldPos | None:
         return self._world_pos
 
+    # Return the stage up axis used by this cursor.
     @property
     def up_axis(self) -> str:
         return self._up_axis
 
+    # Intersect the mouse ray with the active drawing plane.
     def _raycast(self, mouse_ndc: tuple[float, float]) -> tuple[float, float, float] | None:
+        # Transform the near and far mouse positions into a world-space ray.
         ndc_to_world = getattr(self._viewport_api, "ndc_to_world", None)
         if ndc_to_world is None:
             return None
@@ -318,22 +385,31 @@ class _CursorScene:
         fx, fy, fz = float(f[0]), float(f[1]), float(f[2])
         pnx, pny, pnz = float(nrm[0]), float(nrm[1]), float(nrm[2])
         pox, poy, poz = float(org[0]), float(org[1]), float(org[2])
+        # Ignore rays parallel to the drawing plane.
         denom = pnx * (fx - nx) + pny * (fy - ny) + pnz * (fz - nz)
         if abs(denom) < 1e-9:
             return None
         num = pnx * (pox - nx) + pny * (poy - ny) + pnz * (poz - nz)
         t = num / denom
+        # Ignore intersections behind the ray origin.
         if t < 0.0:
             return None
         return (nx + (fx - nx) * t, ny + (fy - ny) * t, nz + (fz - nz) * t)
 
 
+# ----------------------------------------------------------------------
+# 5. HOVER
+# ----------------------------------------------------------------------
+
+
 # Hover gesture: tracks mouse motion to update the brush ring position.
 class _Hover(sc.HoverGesture):  # type: ignore[misc]
+    # Bind the hover gesture to its cursor scene.
     def __init__(self, scene: _CursorScene) -> None:
         cast(Any, super()).__init__()
         self._scene = scene
 
+    # Move the visible brush ring with the mouse.
     def on_changed(self) -> None:
         if not self._scene.visible:
             return
@@ -344,12 +420,19 @@ class _Hover(sc.HoverGesture):  # type: ignore[misc]
             pass
 
 
+# ----------------------------------------------------------------------
+# 6. DRAG
+# ----------------------------------------------------------------------
+
+
 # LMB drag gesture: forwards begin / change / end events to the listener.
 class _Drag(sc.DragGesture):  # type: ignore[misc]
+    # Bind the drag gesture to its cursor scene.
     def __init__(self, scene: _CursorScene) -> None:
         cast(Any, super()).__init__()
         self._scene = scene
 
+    # Resolve the cursor position and begin the stroke.
     def on_began(self) -> None:
         if not self._scene.visible:
             return
@@ -364,6 +447,7 @@ class _Drag(sc.DragGesture):  # type: ignore[misc]
         except Exception:
             pass
 
+    # Forward the latest cursor position to the drawing tool.
     def on_changed(self) -> None:
         if not self._scene.visible:
             return
@@ -378,6 +462,7 @@ class _Drag(sc.DragGesture):  # type: ignore[misc]
         except Exception:
             pass
 
+    # Notify the drawing tool that the stroke has ended.
     def on_ended(self) -> None:
         if not self._scene.visible:
             return

@@ -1,10 +1,20 @@
+# Python & library imports
 import logging
 from typing import Any, Callable, cast
 
+# Local imports
 from ..windows.top_window import TopWindow
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
+
+
+# ----------------------------------------------------------------------
+# 2. HOTKEY MANAGER
+# ----------------------------------------------------------------------
 
 
 # Registers and tears down the launcher's custom hotkeys and actions.
@@ -15,6 +25,7 @@ class HotkeyManager:
     ROTATE_ACTION_ID = "transform_rotate"
     SCALE_ACTION_ID = "transform_scale"
 
+    # Keep a provider for the current command window.
     def __init__(self, top_window_provider: Callable[[], TopWindow | None]) -> None:
         # Provider lets the manager fetch the current top window lazily, since the
         # launcher creates/destroys windows independently of hotkey registration.
@@ -68,6 +79,7 @@ class HotkeyManager:
         def _make_op_callback(op_name: str) -> Callable[..., None]:
             def _callback(*_args: object, **_kwargs: object) -> None:
                 set_transform_op(op_name)
+
             return _callback
 
         for action_id, key, op, label in (

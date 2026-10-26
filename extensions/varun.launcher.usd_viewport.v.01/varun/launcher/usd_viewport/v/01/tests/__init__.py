@@ -8,4 +8,13 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from .test_hello_world import *
+# Import test cases for Kit test discovery.
+import omni as omni
+import omni.ui as ui
+
+from .test_hello_world import (
+    Test as Test,
+)
+
+# Public names retained from the original package exports.
+__all__ = ["Test", "omni", "ui"]

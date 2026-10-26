@@ -1,15 +1,22 @@
+# Python & library imports
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 from typing import Any, cast
 
+# Omniverse & USD imports
 import carb.settings
 import omni.usd
 
-from ..tool import Tool
 from ...active_context import get_active_usd_context
 
+# Local imports
+from ..tool import Tool
+
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,19 +34,31 @@ OP_SCALE = "scale"
 _ICONS_DIR = Path(__file__).resolve().parent.parent.parent / "logos"
 
 
+# ----------------------------------------------------------------------
+# 2. HELPER FUNCTIONS
+# ----------------------------------------------------------------------
+
+
 # Switch the active viewport transform manipulator (Move / Rotate / Scale / Select).
 def set_transform_op(op: str) -> None:
     settings = cast(Any, carb.settings.get_settings())
     settings.set_string(TRANSFORM_OP_SETTING, op)
 
 
+# ----------------------------------------------------------------------
+# 3. TRANSFORM TOOLS
+# ----------------------------------------------------------------------
+
+
 # Builds the standard Move / Rotate / Scale toolbar tools that match USD Composer.
 class TransformTools:
+    # Track transform buttons and their subscriptions.
     def __init__(self) -> None:
         self._tools_by_op: dict[str, Tool] = {}
         self._setting_sub: Any = None
         self._selection_sub: Any = None
 
+    # Create Move, Rotate, and Scale tools and synchronize their highlights.
     def make_tools(self) -> list[Tool]:
         # Build one toggleable Tool per transform op and remember them so we
         # can flip is_active when the carb setting changes.
@@ -68,9 +87,7 @@ class TransformTools:
         # update the button highlight.
         settings = cast(Any, carb.settings.get_settings())
         try:
-            self._setting_sub = settings.subscribe_to_node_change_events(
-                TRANSFORM_OP_SETTING, self._on_setting_changed
-            )
+            self._setting_sub = settings.subscribe_to_node_change_events(TRANSFORM_OP_SETTING, self._on_setting_changed)
         except Exception as exc:  # pragma: no cover - depends on carb runtime
             LOGGER.warning("Could not subscribe to %s: %s", TRANSFORM_OP_SETTING, exc)
 
@@ -91,6 +108,7 @@ class TransformTools:
 
         return tools
 
+    # Release transform-setting and selection subscriptions.
     def destroy(self) -> None:
         if self._setting_sub is not None:
             try:

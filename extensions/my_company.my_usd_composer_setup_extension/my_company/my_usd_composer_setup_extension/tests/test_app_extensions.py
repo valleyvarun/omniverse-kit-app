@@ -8,8 +8,13 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# Omniverse & USD imports
 import omni.kit.app
 from omni.kit.test import AsyncTestCase
+
+# ----------------------------------------------------------------------
+# 1. TEST USDCOMPOSER EXTENSIONS
+# ----------------------------------------------------------------------
 
 
 class TestUSDComposerExtensions(AsyncTestCase):
@@ -36,7 +41,7 @@ class TestUSDComposerExtensions(AsyncTestCase):
             print("")
             print(f"[error] Found {len(failures)} extensions that could not load:")
             for count, ext in enumerate(failures):
-                print(f"  {count+1}: {ext}")
+                print(f"  {count + 1}: {ext}")
             print("")
         return len(failures)
 

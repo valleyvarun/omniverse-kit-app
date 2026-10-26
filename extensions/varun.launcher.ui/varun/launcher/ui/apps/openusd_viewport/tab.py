@@ -1,8 +1,12 @@
 """Shared types and constants for the openusd_viewport package."""
 
+# Python & library imports
 from dataclasses import dataclass, field
 from typing import Callable
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 # Title of the very first viewport tab.
 FIRST_VIEWPORT_TITLE = "Viewport"
@@ -18,6 +22,11 @@ SHARED_CTX_NAME = "viewport_shared"
 
 # Callback signature: ``(tab_name, is_selected)``.
 ViewportDockCallback = Callable[[str, bool], None]
+
+
+# ----------------------------------------------------------------------
+# 2. DATA STRUCTURE: VIEWPORT STATE
+# ----------------------------------------------------------------------
 
 
 @dataclass
@@ -38,6 +47,11 @@ class ViewportState:
     # time the tab is focused, then re-applies the saved value on every
     # subsequent switch so it never silently reverts to Stage Lights.
     lighting_mode: str | None = None
+
+
+# ----------------------------------------------------------------------
+# 3. DATA STRUCTURE: TAB
+# ----------------------------------------------------------------------
 
 
 @dataclass

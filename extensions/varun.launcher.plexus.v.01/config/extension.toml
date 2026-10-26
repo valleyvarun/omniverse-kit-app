@@ -1,0 +1,18 @@
+[package]
+title = "Plexus"
+version = "1.0.0"
+description = "Native graph editor UI in launcher workspace tabs."
+category = "Launcher"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.actions.core" = {}
+"omni.kit.graph.editor.core" = {}
+"omni.kit.widget.graph" = {}
+"varun.launcher.workspace.v.01" = {}
+
+[[python.module]]
+name = "plexus"
+
+[[test]]
+dependencies = ["omni.kit.test", "omni.kit.ui_test"]

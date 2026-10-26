@@ -1,17 +1,29 @@
+# Python & library imports
 from pathlib import Path
 from typing import Any
 
+# Omniverse & USD imports
 import omni.ui as ui
 from omni.kit.window.filepicker import FilePickerDialog
 
+# Local imports
 from ..startup.styles import AGENT_WINDOW_BACKGROUND_STYLE
 from .window import LauncherWindow
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parents[7]
 
 
+# ----------------------------------------------------------------------
+# 2. LEFT WINDOW
+# ----------------------------------------------------------------------
+
+
 class LeftWindow(LauncherWindow):
+    # Create the Explorer window and track its folder picker.
     def __init__(self) -> None:
         # Keep a handle to the folder dialog so it can be replaced or closed cleanly.
         self._folder_dialog: FilePickerDialog | None = None
@@ -20,18 +32,22 @@ class LeftWindow(LauncherWindow):
             width=100,
         )
 
+    # Close the folder picker after the user accepts.
     def _on_folder_dialog_apply(self, filename: str, dirname: str) -> None:
         # Close the popup after the user accepts the current folder selection.
         self._close_folder_dialog()
 
+    # Close the folder picker after cancellation.
     def _on_folder_dialog_cancel(self, filename: str, dirname: str) -> None:
         # Close the popup when the user cancels the dialog.
         self._close_folder_dialog()
 
+    # Allow only folders in the picker.
     def _filter_folder_items(self, item: Any) -> bool:
         # Only show folder entries inside the project-folder picker.
         return not item or bool(item.is_folder)
 
+    # Create a fresh project-folder picker.
     def _show_project_folder_dialog(self) -> None:
         # Recreate the dialog each time so the popup opens in a clean state.
         if self._folder_dialog is not None:
@@ -48,12 +64,14 @@ class LeftWindow(LauncherWindow):
             current_directory=str(PROJECT_ROOT),
         )
 
+    # Destroy the folder picker and clear its handle.
     def _close_folder_dialog(self) -> None:
         # Destroy the popup instance once it is no longer needed.
         if self._folder_dialog is not None:
             self._folder_dialog.destroy()
             self._folder_dialog = None
 
+    # Center the project-folder button in the Explorer panel.
     def _build_ui(self) -> None:
         if not self._window:
             return
@@ -67,6 +85,8 @@ class LeftWindow(LauncherWindow):
                     ui.Spacer()
                     with ui.HStack(width=ui.Fraction(1), height=0):
                         ui.Spacer()
-                        ui.Button("open project folder", width=135, height=32, clicked_fn=self._show_project_folder_dialog)
+                        ui.Button(
+                            "open project folder", width=135, height=32, clicked_fn=self._show_project_folder_dialog
+                        )
                         ui.Spacer()
                     ui.Spacer()

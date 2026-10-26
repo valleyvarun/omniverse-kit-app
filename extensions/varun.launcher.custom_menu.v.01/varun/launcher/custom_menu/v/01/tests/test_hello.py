@@ -12,8 +12,14 @@
 #   omni.kit.test - std python's unittest module with additional wrapping to add support for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 # Import extension python module we are testing with absolute import path, as if we are an external user (other extension)
-import varun.launcher.custom_menu.v.01
+from importlib import import_module
+
+# Omniverse & USD imports
 import omni.kit.test
+
+# ----------------------------------------------------------------------
+# 1. TEST
+# ----------------------------------------------------------------------
 
 
 # Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of the module
@@ -27,7 +33,8 @@ class Test(omni.kit.test.AsyncTestCaseFailOnLogError):
     async def tearDown(self):
         pass
 
-    # Actual test, notice it is an "async" function, so "await" can be used if needed
-    async def test_hello_public_function(self):
-        result = varun.launcher.custom_menu.v.01.some_public_function(4)
-        self.assertEqual(result, 256)
+    # Check the extension entry point exposed to Kit.
+    async def test_extension_entry_point(self):
+        module = import_module("varun.launcher.custom_menu.v.01")
+        self.assertTrue(callable(module.MyExtension.on_startup))
+        self.assertTrue(callable(module.MyExtension.on_shutdown))

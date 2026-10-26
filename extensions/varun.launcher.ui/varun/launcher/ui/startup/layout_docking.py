@@ -1,19 +1,31 @@
+# Python & library imports
 import asyncio
 import logging
 from typing import Any, cast
 
+# Omniverse & USD imports
 import omni.kit.menu.utils
 from omni.kit.menu.utils import MenuItemDescription
 
+# Local imports
 from .startup_defaults import StartupDefaults
 
+# ----------------------------------------------------------------------
+# 1. CONSTANTS & CONFIGURATION
+# ----------------------------------------------------------------------
 
 LOGGER = logging.getLogger(__name__)
 MENU_UTILS = cast(Any, omni.kit.menu.utils)
 
 
+# ----------------------------------------------------------------------
+# 2. LAYOUT DOCKING
+# ----------------------------------------------------------------------
+
+
 # Manages dock styling and the "Apply Default Layout" Window menu entry.
 class LayoutDocking:
+    # Store layout defaults and registered menu handles.
     def __init__(self, startup_defaults: StartupDefaults) -> None:
         self._startup_defaults = startup_defaults
         self._default_layout_menu_items: list[MenuItemDescription] = []
