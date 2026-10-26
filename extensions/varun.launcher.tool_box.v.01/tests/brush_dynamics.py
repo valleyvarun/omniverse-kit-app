@@ -33,7 +33,7 @@ from tool_box.tools.drawing.brush import (
 )
 from tool_box.tools.drawing.curves.mesh import CAP_RINGS, PipeMesh
 from tool_box.tools.drawing.pen import PenInfo, PenInput, PointerInfo
-from tool_box.tools.drawing.points.mesh import CHUNK_SEGMENTS, JOIN_CONTEXT, PaintMesh
+from tool_box.tools.drawing.points.mesh import CHUNK_SEGMENTS, PaintMesh
 from tool_box.tools.drawing.properties import ThreeDDrawPropertiesPanel
 from tool_box.tools.drawing.shapes import outline
 
@@ -135,7 +135,7 @@ def check_geometry() -> dict[str, object]:
     chunks: list[Any] = list(stage.GetPrimAtPath("/World/ThreeDDraw/Long").GetChildren())
     for index, prim in enumerate(chunks):
         # Allow the provisional end segment and the two stroke caps.
-        assert len(prim.GetAttribute("points").Get()) <= (CHUNK_SEGMENTS + JOIN_CONTEXT + 3) * 4
+        assert len(prim.GetAttribute("points").Get()) <= (CHUNK_SEGMENTS + 3) * 4
         assert np.allclose(prim.GetAttribute("paint:radius").Get(), 4.0)
         if index + 1 < len(chunks):
             section: int = (len(prim.GetAttribute("paint:centerline").Get()) - 2) * 4

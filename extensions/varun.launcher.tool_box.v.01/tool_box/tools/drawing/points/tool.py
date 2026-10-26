@@ -16,6 +16,7 @@ from tool_box.core.viewport import get_active_stage, get_active_usd_context
 from tool_box.tools.drawing.brush import BrushConfig
 from tool_box.tools.drawing.cursor import Cursor3D
 from tool_box.tools.drawing.points.mesh import PaintMesh
+from tool_box.tools.drawing.points.repair import PaintRepair
 from tool_box.tools.drawing.settings import (
     DRAW_ROOT,
     EMIT_INTERVAL,
@@ -34,6 +35,7 @@ class ThreeDDrawTool:
     ICON_NAME: str = "brush_oval.png"
 
     def __init__(self) -> None:
+        self.repairs: PaintRepair = PaintRepair()
         self._tool: Tool | None = None
         self._is_active: bool = False
         self._stroke_stage: Any = None
@@ -68,6 +70,7 @@ class ThreeDDrawTool:
     # CLEANUP ON SHUTDOWN.
     def destroy(self) -> None:
         self.deactivate()
+        self.repairs.destroy()
         self._tool = None
 
     # TOGGLE THE TOOL.
@@ -179,10 +182,11 @@ class ThreeDDrawTool:
         try:
             self._flush_mesh()
             if stage is not None and stage.GetPrimAtPath(LIVE_STROKE_PATH):
-                # Preserve the finished meshes without rebuilding their geometry.
+                # Keep the preview visible until the completed stroke has been remeshed.
                 layer: Any = stage.GetRootLayer()
                 path: str = self._allocate_stroke_path(stage)
                 cast(Any, Sdf).CopySpec(layer, LIVE_STROKE_PATH, layer, path)
+                self.repairs.queue(stage, path)
         except Exception:
             LOGGER.exception("3D paint: could not finish stroke")
         finally:

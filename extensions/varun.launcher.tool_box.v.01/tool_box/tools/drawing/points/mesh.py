@@ -19,7 +19,6 @@ Vec3: TypeAlias = tuple[float, float, float]
 StrokePoint: TypeAlias = tuple[Vec3, BrushSample]
 FloatArray: TypeAlias = NDArray[np.float32]
 CHUNK_SEGMENTS: int = 128
-JOIN_CONTEXT: int = 32
 _SHAPE_IDS: dict[BrushShape, float] = {"circle": 0.0, "square": 1.0, "triangle": 2.0}
 
 
@@ -57,9 +56,11 @@ def _indices(points: FloatArray) -> NDArray[np.int32]:
 @dataclass(frozen=True)
 class SegmentGeometry:
     points: FloatArray
+    coordinates: FloatArray
+    sides: FloatArray
+    dynamics: FloatArray
+    modes: FloatArray
     sections: FloatArray
-    sources: NDArray[np.int32]
-    corners: NDArray[np.int32]
 
 
 def _sample_data(samples: list[StrokePoint]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -95,9 +96,11 @@ def _geometry(
         points: NDArray[np.float64] = centers[0] + coordinates @ basis * values[0, 0]
         return SegmentGeometry(
             points.astype(np.float32),
+            coordinates.astype(np.float32),
+            np.ones((4, 2), dtype=np.float32),
+            np.tile(values[0, 1:], (4, 1)).astype(np.float32),
+            np.asarray([4.0 + _SHAPE_IDS[shape]], dtype=np.float32),
             np.empty((0, 2, 3), dtype=np.float32),
-            np.zeros(1, dtype=np.int32),
-            np.full(1, -1, dtype=np.int32),
         )
     delta: NDArray[np.float64] = np.diff(centers, axis=0) @ basis.T
     first: NDArray[np.float64] = (centers[0] - np.asarray(before[0])) @ basis.T if before is not None else delta[0]
@@ -112,64 +115,20 @@ def _geometry(
     tangents: NDArray[np.float64] = incoming + outgoing
     lengths: NDArray[np.float64] = np.linalg.norm(tangents, axis=1, keepdims=True)
     tangents = np.where(lengths > 1e-4, tangents / np.maximum(lengths, 1e-9), outgoing)
-    neighborhood: NDArray[np.int32] = np.arange(len(samples), dtype=np.int32)
-    bend_in: NDArray[np.float64] = centers - centers[np.maximum(neighborhood - 2, 0)]
-    bend_out: NDArray[np.float64] = centers[np.minimum(neighborhood + 2, len(samples) - 1)] - centers
-    bend_in[0] = bend_out[0]
-    bend_out[-1] = bend_in[-1]
-    bend_in /= np.maximum(np.linalg.norm(bend_in, axis=1, keepdims=True), 1e-9)
-    bend_out /= np.maximum(np.linalg.norm(bend_out, axis=1, keepdims=True), 1e-9)
-    turning: NDArray[np.float64] = np.sum(bend_in * bend_out, axis=1)
-    candidates: NDArray[np.int64] = np.argsort(turning).astype(np.int64)
-    corners: list[int] = []
-    candidate: np.int64
-    corner_index: int
-    for candidate in candidates:
-        corner_index = int(candidate)
-        if turning[corner_index] > 0.5:
-            break
-        separated: bool = True
-        other: int
-        for other in corners:
-            if float(np.linalg.norm(centers[corner_index] - centers[other])) <= max(
-                values[corner_index, 0], values[other, 0]
-            ):
-                separated = False
-                break
-        if separated:
-            corners.append(corner_index)
-    for corner_index in corners:
-        bisector: NDArray[np.float64] = (bend_in[corner_index] + bend_out[corner_index]) @ basis.T
-        bisector /= max(float(np.linalg.norm(bisector)), 1e-9)
-        tangents[corner_index] = bisector
     normals: NDArray[np.float64] = np.stack((-tangents[:, 1], tangents[:, 0]), axis=1)
     left: NDArray[np.float64] = np.ones(len(samples)) if shape == "circle" else np.max(normals @ profile.T, axis=1)
     right_side: NDArray[np.float64] = (
         np.ones(len(samples)) if shape == "circle" else np.max(-normals @ profile.T, axis=1)
     )
-    # Cover the outside of the bend; the shader clips this envelope to the brush.
-    half_cosine: NDArray[np.float64] = np.minimum(
-        np.abs(np.sum(tangents * incoming, axis=1)), np.abs(np.sum(tangents * outgoing, axis=1))
-    )
-    widths: NDArray[np.float64] = (
-        np.stack((right_side, left), axis=1) * values[:, :1] / np.maximum(half_cosine[:, None], 0.25)
-    )
-    full_widths: NDArray[np.float64] = widths.copy()
-    # Trim smooth tight loops; sharp corners are partitioned below instead.
+    # Keep joins within the brush footprint instead of extending a pointed miter.
+    widths: NDArray[np.float64] = np.stack((right_side, left), axis=1) * values[:, :1]
+    brush_widths: NDArray[np.float64] = widths.copy()
+    # Trim the inside of a tight bend before its offset edges fold across each other.
     half_sine: NDArray[np.float64] = np.sqrt(np.maximum(0.0, (1.0 - np.sum(incoming * outgoing, axis=1)) * 0.5))
     inner_limit: NDArray[np.float64] = adjacent_length / np.maximum(2.0 * half_sine, 1e-9)
     turn: NDArray[np.float64] = incoming[:, 0] * outgoing[:, 1] - incoming[:, 1] * outgoing[:, 0]
     widths[:, 1] = np.where(turn > 0.0, np.minimum(widths[:, 1], inner_limit), widths[:, 1])
     widths[:, 0] = np.where(turn < 0.0, np.minimum(widths[:, 0], inner_limit), widths[:, 0])
-    arc: NDArray[np.float64] = np.concatenate((np.zeros(1), np.cumsum(np.linalg.norm(delta, axis=1))))
-    sharp: NDArray[np.int64] = np.flatnonzero(turning <= 0.5).astype(np.int64)
-    sharp_index: np.int64
-    for sharp_index in sharp:
-        nearby_bend: NDArray[np.bool_] = np.abs(arc - arc[sharp_index]) < values[sharp_index, 0] * 4.0
-        widths[nearby_bend] = full_widths[nearby_bend]
-    for corner_index in corners:
-        inner_side: int = 1 if turn[corner_index] > 0.0 else 0
-        widths[corner_index, inner_side] = min(widths[corner_index, inner_side], inner_limit[corner_index])
     directions: NDArray[np.float64] = normals @ basis
     sections: NDArray[np.float64] = np.stack(
         (centers - directions * widths[:, :1], centers + directions * widths[:, 1:]), axis=1
@@ -177,11 +136,62 @@ def _geometry(
     # Keep abrupt reversals from crossing the two edges of a segment quad.
     reverse: NDArray[np.bool_] = np.sum(normals[:-1] * normals[1:], axis=1) < 0.0
     end_sections: NDArray[np.float64] = sections[1:].copy()
+    end_widths: NDArray[np.float64] = widths[1:].copy()
+    end_sides: NDArray[np.float64] = brush_widths[1:].copy()
     end_sections[reverse] = end_sections[reverse, ::-1]
+    end_widths[reverse] = end_widths[reverse, ::-1]
+    end_sides[reverse] = end_sides[reverse, ::-1]
     quad_points: NDArray[np.float64] = np.stack(
         (sections[:-1, 0], end_sections[:, 0], end_sections[:, 1], sections[:-1, 1]), axis=1
     )
-    sources: list[int] = list(range(len(samples) - 1))
+    quad_cross: NDArray[np.float64] = np.stack(
+        (-widths[:-1, 0], -end_widths[:, 0], end_widths[:, 1], widths[:-1, 1]), axis=1
+    )
+    quad_coords: NDArray[np.float64] = np.stack((quad_cross, np.zeros_like(quad_cross)), axis=-1)
+    quad_sides: NDArray[np.float64] = np.stack((brush_widths[:-1], end_sides, end_sides, brush_widths[:-1]), axis=1)
+    quad_dynamics: NDArray[np.float64] = np.stack(
+        (values[:-1, 1:], values[1:, 1:], values[1:, 1:], values[:-1, 1:]), axis=1
+    )
+    modes: list[float] = [0.0] * (len(samples) - 1)
+    # Round only the outside sector of tight joins, without layering whole disks.
+    tight: NDArray[np.bool_] = inner_limit < np.max(brush_widths, axis=1)
+    join_ids: NDArray[np.int64] = np.flatnonzero(tight).astype(np.int64)
+    if len(join_ids):
+        sign: NDArray[np.float64] = -np.sign(turn[join_ids])[:, None]
+        incoming_normal: NDArray[np.float64] = np.stack((-incoming[join_ids, 1], incoming[join_ids, 0]), axis=1) * sign
+        outgoing_normal: NDArray[np.float64] = np.stack((-outgoing[join_ids, 1], outgoing[join_ids, 0]), axis=1) * sign
+        incoming_support: NDArray[np.float64] = (
+            np.ones(len(join_ids)) if shape == "circle" else np.max(incoming_normal @ profile.T, axis=1)
+        )
+        outgoing_support: NDArray[np.float64] = (
+            np.ones(len(join_ids)) if shape == "circle" else np.max(outgoing_normal @ profile.T, axis=1)
+        )
+        first_outer: NDArray[np.float64] = incoming_normal * incoming_support[:, None]
+        last_outer: NDArray[np.float64] = outgoing_normal * outgoing_support[:, None]
+        corner: NDArray[np.float64] = (
+            normals[join_ids] * sign / np.maximum(np.sum(tangents[join_ids] * outgoing[join_ids], axis=1), 0.5)[:, None]
+        )
+        corner *= np.maximum(incoming_support, outgoing_support)[:, None]
+        outer_column: NDArray[np.int64] = (turn[join_ids] < 0.0).astype(np.int64)
+        inner: NDArray[np.float64] = ((sections[join_ids, 1 - outer_column] - centers[join_ids]) @ basis.T) / values[
+            join_ids, :1
+        ]
+        join_coords: NDArray[np.float64] = np.stack((inner, first_outer, corner, last_outer), axis=1)
+        join_points: NDArray[np.float64] = (
+            centers[join_ids, None, :] + (join_coords @ basis) * values[join_ids, :1, None]
+        )
+        previous: NDArray[np.bool_] = join_ids > 0
+        following: NDArray[np.bool_] = join_ids < len(samples) - 1
+        quad_points[join_ids[previous] - 1, 1 + outer_column[previous]] = join_points[previous, 1]
+        quad_points[join_ids[following], 3 * outer_column[following]] = join_points[following, 3]
+        # The preceding chunk owns the join at its shared last point.
+        quad_points = np.concatenate((quad_points, join_points[previous]), axis=0)
+        quad_coords = np.concatenate((quad_coords, join_coords[previous]), axis=0)
+        quad_sides = np.concatenate((quad_sides, np.ones((int(previous.sum()), 4, 2))), axis=0)
+        quad_dynamics = np.concatenate(
+            (quad_dynamics, np.repeat(values[join_ids[previous], None, 1:], 4, axis=1)), axis=0
+        )
+        modes.extend([4.0 + _SHAPE_IDS[shape]] * int(previous.sum()))
     endpoint: int
     outward: float
     is_end: bool
@@ -197,71 +207,27 @@ def _geometry(
                 sections[endpoint, 0] + extension,
             ]
         )
+        cap_coords: NDArray[np.float64] = np.asarray(
+            [
+                (-widths[endpoint, 0], 0.0),
+                (widths[endpoint, 1], 0.0),
+                (widths[endpoint, 1], 1.0),
+                (-widths[endpoint, 0], 1.0),
+            ]
+        )
         quad_points = np.concatenate((quad_points, cap[None, :, :]), axis=0)
-        sources.append(0 if endpoint == 0 else len(samples) - 2)
-    # Partition the inside of a sharp bend at its bisector. Short ribbon
-    # segments must not layer over one another as they approach the corner.
-    segment_sources: NDArray[np.int32] = np.asarray(sources, dtype=np.int32)
-    polygons: list[NDArray[np.float64]] = list(quad_points)
-    polygon_corners: NDArray[np.int32] = np.full(len(polygons), -1, dtype=np.int32)
-    for corner_index in corners:
-        direction: NDArray[np.float64] = tangents[corner_index] @ basis
-        nearby_points: NDArray[np.bool_] = np.abs(arc - arc[corner_index]) < values[corner_index, 0] * 4.0
-        center_side: NDArray[np.float64] = (centers - centers[corner_index]) @ direction
-        if np.any(center_side[:corner_index][nearby_points[:corner_index]] > 0.0) or np.any(
-            center_side[corner_index:][nearby_points[corner_index:]] < 0.0
-        ):
-            continue
-        nearby: NDArray[np.bool_] = np.abs(arc[segment_sources] - arc[corner_index]) < values[corner_index, 0] * 4.0
-        polygon_index: np.int64
-        for polygon_index in np.flatnonzero(nearby).astype(np.int64):
-            side: float = -1.0 if segment_sources[polygon_index] < corner_index else 1.0
-            polygon_corners[polygon_index] = corner_index
-            polygons[int(polygon_index)] = _clip(polygons[int(polygon_index)], centers[corner_index], direction * side)
-    pieces: list[NDArray[np.float64]] = []
-    piece_sources: list[int] = []
-    piece_corners: list[int] = []
-    polygon: NDArray[np.float64]
-    source: int
-    polygon_number: int
-    for polygon_number, (polygon, source) in enumerate(zip(polygons, sources)):
-        if len(polygon) == 4:
-            pieces.append(polygon)
-            piece_sources.append(source)
-            piece_corners.append(int(polygon_corners[polygon_number]))
-        else:
-            triangle: int
-            for triangle in range(1, len(polygon) - 1):
-                pieces.append(polygon[[0, triangle, triangle + 1, triangle + 1]])
-                piece_sources.append(source)
-                piece_corners.append(int(polygon_corners[polygon_number]))
+        quad_coords = np.concatenate((quad_coords, cap_coords[None, :, :]), axis=0)
+        quad_sides = np.concatenate((quad_sides, np.tile(widths[endpoint], (1, 4, 1))), axis=0)
+        quad_dynamics = np.concatenate((quad_dynamics, np.tile(values[endpoint, 1:], (1, 4, 1))), axis=0)
+        modes.append(1.0 + _SHAPE_IDS[shape])
     return SegmentGeometry(
-        np.asarray(pieces, dtype=np.float32).reshape(-1, 3),
+        quad_points.reshape(-1, 3).astype(np.float32),
+        quad_coords.reshape(-1, 2).astype(np.float32),
+        quad_sides.reshape(-1, 2).astype(np.float32),
+        quad_dynamics.reshape(-1, 2).astype(np.float32),
+        np.asarray(modes, dtype=np.float32),
         sections.astype(np.float32),
-        np.asarray(piece_sources, dtype=np.int32),
-        np.asarray(piece_corners, dtype=np.int32),
     )
-
-
-def _clip(
-    polygon: NDArray[np.float64], origin: NDArray[np.float64], direction: NDArray[np.float64]
-) -> NDArray[np.float64]:
-    """Intersect ribbon edges with a corner bisector without folding their vertices."""
-    if len(polygon) == 0:
-        return polygon
-    distance: NDArray[np.float64] = (polygon - origin) @ direction
-    if np.all(distance >= 0.0):
-        return polygon
-    result: list[NDArray[np.float64]] = []
-    current: int
-    for current in range(len(polygon)):
-        previous: int = current - 1
-        if (distance[current] >= 0.0) != (distance[previous] >= 0.0):
-            factor: float = float(distance[previous] / (distance[previous] - distance[current]))
-            result.append(polygon[previous] + factor * (polygon[current] - polygon[previous]))
-        if distance[current] >= 0.0:
-            result.append(polygon[current])
-    return np.asarray(result, dtype=np.float64).reshape(-1, 3)
 
 
 class PaintMesh:
@@ -274,8 +240,8 @@ class PaintMesh:
         self._up: Vec3 = up
         self._shape: BrushShape = shape
         self._points: list[StrokePoint] = []
-        self._frozen: list[tuple[int, list[StrokePoint], list[StrokePoint], list[StrokePoint]]] = []
-        self._before: list[StrokePoint] = []
+        self._frozen: list[tuple[int, list[StrokePoint], StrokePoint | None, StrokePoint | None]] = []
+        self._before: StrokePoint | None = None
         self._chunk: int = 0
         self._anchor: StrokePoint | None = None
         self._control: StrokePoint | None = None
@@ -298,15 +264,15 @@ class PaintMesh:
         c: NDArray[np.float64] = np.asarray(position, dtype=np.float64)
         incoming: NDArray[np.float64] = b - a
         outgoing: NDArray[np.float64] = c - b
-        if float(np.dot(incoming, outgoing)) < -0.95 * float(np.linalg.norm(incoming) * np.linalg.norm(outgoing)):
+        if float(np.dot(incoming, outgoing)) < -0.5 * float(np.linalg.norm(incoming) * np.linalg.norm(outgoing)):
             # Close a reversal with round ends instead of folding one ribbon through itself.
             if _separated(self._points[-1], self._control):
                 self._points.append(self._control)
             elif len(self._points) > 1:
                 self._points[-1] = self._control
-            self._frozen.append((self._chunk, self._points, self._before, []))
+            self._frozen.append((self._chunk, self._points, self._before, None))
             self._chunk += 1
-            self._before = []
+            self._before = None
             self._points = [self._control]
             self._anchor = self._control
             self._control = point
@@ -335,14 +301,13 @@ class PaintMesh:
             return
         self._points.append(point)
         self._dirty = True
-        # Retain both sides of a bend until its brush footprint is settled.
-        if len(self._points) == CHUNK_SEGMENTS + JOIN_CONTEXT + 1:
-            completed: list[StrokePoint] = self._points[: CHUNK_SEGMENTS + 1]
-            following: list[StrokePoint] = self._points[CHUNK_SEGMENTS + 1 :]
-            self._frozen.append((self._chunk, completed, self._before, following))
-            self._before = completed[-JOIN_CONTEXT - 1 : -1]
+        # Freeze only after the following point fixes the shared seam direction.
+        if len(self._points) == CHUNK_SEGMENTS + 2:
+            completed: list[StrokePoint] = self._points[:-1]
+            self._frozen.append((self._chunk, completed, self._before, point))
+            self._before = completed[-2]
             self._chunk += 1
-            self._points = self._points[CHUNK_SEGMENTS:]
+            self._points = [completed[-1], point]
 
     def flush(self) -> None:
         if not self._dirty:
@@ -350,8 +315,8 @@ class PaintMesh:
         cast(Any, UsdGeom.Xform).Define(self._stage, self._path)
         index: int
         samples: list[StrokePoint]
-        before: list[StrokePoint]
-        after: list[StrokePoint]
+        before: StrokePoint | None
+        after: StrokePoint | None
         for index, samples, before, after in self._frozen:
             self._write(index, samples, before, after)
         self._frozen.clear()
@@ -366,23 +331,11 @@ class PaintMesh:
         self,
         index: int,
         samples: list[StrokePoint],
-        before: list[StrokePoint] | None = None,
-        after: list[StrokePoint] | None = None,
+        before: StrokePoint | None = None,
+        after: StrokePoint | None = None,
     ) -> None:
-        preceding: list[StrokePoint] = before or []
-        following: list[StrokePoint] = after or []
-        context: list[StrokePoint] = [*preceding, *samples, *following]
-        geometry: SegmentGeometry = _geometry(context, self._right, self._up, self._shape)
-        keep: NDArray[np.bool_] = (geometry.sources >= len(preceding)) & (
-            geometry.sources < len(preceding) + max(1, len(samples) - 1)
-        )
-        geometry = SegmentGeometry(
-            geometry.points.reshape(-1, 4, 3)[keep].reshape(-1, 3),
-            geometry.sections,
-            geometry.sources[keep],
-            geometry.corners[keep],
-        )
-        segments: int = len(geometry.sources)
+        geometry: SegmentGeometry = _geometry(samples, self._right, self._up, self._shape, before, after)
+        segments: int = len(geometry.modes)
         mesh: Any = cast(Any, UsdGeom.Mesh).Define(self._stage, f"{self._path}/Paint_{index:04d}")
         mesh.CreateSubdivisionSchemeAttr().Set("none")
         mesh.CreateDoubleSidedAttr().Set(True)
@@ -391,36 +344,18 @@ class PaintMesh:
         mesh.CreateFaceVertexIndicesAttr().Set(cast(Any, Vt).IntArray.FromNumpy(_indices(geometry.points)))
         mesh.CreateDisplayColorAttr().Set([(0.0, 0.0, 0.0)])
         primvars: Any = cast(Any, UsdGeom.PrimvarsAPI)(mesh)
-        # Every piece evaluates the same nearby centerline, including its joins.
-        extended: list[StrokePoint] = [context[0], *context, context[-1]]
-        centers: NDArray[np.float64]
-        dynamics: NDArray[np.float64]
-        centers, dynamics = _sample_data(extended)
-        basis: NDArray[np.float64] = np.asarray([self._right, self._up], dtype=np.float64)
-        origin: NDArray[np.float64] = np.asarray(samples[0][0], dtype=np.float64)
-        position: FloatArray = ((geometry.points.astype(np.float64) - origin) @ basis.T).astype(np.float32)
-        primvars.CreatePrimvar("paintPosition", Sdf.ValueTypeNames.Float2Array, "vertex").Set(
-            cast(Any, Vt).Vec2fArray.FromNumpy(position)
-        )
-        neighbors: NDArray[np.int32] = np.minimum(
-            geometry.sources[:, None] + np.arange(4, dtype=np.int32), len(extended) - 1
-        )
-        # All clipped pieces include the shared corner in their coverage calculation.
-        joined: NDArray[np.bool_] = geometry.corners >= 0
-        neighbors[joined, 3] = geometry.corners[joined] + 1
-        packed: FloatArray = np.column_stack(((centers - origin) @ basis.T, dynamics[:, 0], dynamics[:, 2])).astype(
-            np.float32
-        )
-        column: int
-        for column in range(4):
-            primvars.CreatePrimvar(f"paintPoint{column}", Sdf.ValueTypeNames.Float4Array, "uniform").Set(
-                cast(Any, Vt).Vec4fArray.FromNumpy(np.repeat(packed[neighbors[:, column]], 2, axis=0))
+        name: str
+        values: FloatArray
+        for name, values in (
+            ("paintCoord", geometry.coordinates),
+            ("paintSides", geometry.sides),
+            ("paintDynamics", geometry.dynamics),
+        ):
+            primvars.CreatePrimvar(name, Sdf.ValueTypeNames.Float2Array, "vertex").Set(
+                cast(Any, Vt).Vec2fArray.FromNumpy(values)
             )
-        primvars.CreatePrimvar("paintHardness", Sdf.ValueTypeNames.Float4Array, "uniform").Set(
-            cast(Any, Vt).Vec4fArray.FromNumpy(np.repeat(dynamics[neighbors, 1].astype(np.float32), 2, axis=0))
-        )
-        primvars.CreatePrimvar("paintVersion", Sdf.ValueTypeNames.Float2, "constant").Set(
-            (1.0, _SHAPE_IDS[self._shape])
+        primvars.CreatePrimvar("paintMode", Sdf.ValueTypeNames.FloatArray, "uniform").Set(
+            cast(Any, Vt).FloatArray.FromNumpy(np.repeat(geometry.modes, 2))
         )
         mesh.CreateExtentAttr().Set(
             cast(Any, Vt).Vec3fArray.FromNumpy(

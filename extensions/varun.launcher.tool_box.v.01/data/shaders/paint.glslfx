@@ -83,7 +83,9 @@ vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     float mode = HdGetScalar_paintMode();
     float cross = abs(coord.x) / max(coord.x < 0.0 ? sides.x : sides.y, 1e-6);
     float distance = cross;
-    if (mode > 3.5) {
+    if (mode > 7.5) {
+        distance = coord.x;
+    } else if (mode > 3.5) {
         if (mode < 4.5) distance = length(coord);
         else if (mode < 5.5) distance = max(abs(coord.x), abs(coord.y));
         else distance = max(-2.0 * coord.y, sqrt(3.0) * abs(coord.x) + coord.y);

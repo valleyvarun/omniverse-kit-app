@@ -56,6 +56,7 @@ class ToolBoxExtension(omni.ext.IExt):
             ensure_paint_material(stage)
         if self._controller is not None:
             self._controller.cancel()
+            self._controller.points.repairs.open_stage(stage)
         PlaneSelection.get().notify()
         if self._window is not None:
             self._window.on_viewport_changed()

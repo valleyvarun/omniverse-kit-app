@@ -24,6 +24,7 @@ from pxr import Gf, UsdGeom, UsdShade
 from tool_box.extension import ToolBoxExtension
 from tool_box.tools.drawing.brush import BrushSample
 from tool_box.tools.drawing.points import mesh as paint_mesh
+from tool_box.tools.drawing.points.repair import PaintRepair
 
 OUTPUT: Path = Path(__file__).resolve().parents[4] / "_build/stroke_upgrade_checks/quality"
 
@@ -51,8 +52,10 @@ async def run() -> None:
         carb.windowing.acquire_windowing_interface().hide_window(omni.appwindow.get_default_app_window().get_window())
         await settle(120)
         api: Any = next(iter(get_viewport_window_instances(usd_context_name=None))).viewport_api
+        api.resolution = (640, 480)
         stage: Any = api.stage
         assert api.render_mode == "HdStormRendererPlugin"
+        assert carb.settings.get_settings().get("/app/runLoops/main/rateLimitFrequency") == 30
         camera: Any = cast(Any, UsdGeom.Camera).Define(stage, "/World/QualityCamera")
         camera.CreateProjectionAttr().Set("orthographic")
         camera.CreateHorizontalApertureAttr().Set(800.0)
@@ -66,6 +69,7 @@ async def run() -> None:
         chunk_size: int
         row: int
         index: int
+        repair: PaintRepair = PaintRepair()
         for group, chunk_size in (("Reference", 8192), ("Chunked", 128)):
             cast(Any, UsdGeom.Xform).Define(stage, f"/World/Checks/{group}")
             paint_mesh.CHUNK_SEGMENTS = chunk_size
@@ -86,6 +90,8 @@ async def run() -> None:
                     if index % 30 == 0:
                         stroke.flush()
                 stroke.flush()
+                assert await repair.repair(stage, f"/World/Checks/{group}/Stroke_{row}")
+                assert not await repair.repair(stage, f"/World/Checks/{group}/Stroke_{row}")
             cast(Any, UsdGeom.Imageable)(stage.GetPrimAtPath(f"/World/Checks/{group}")).MakeInvisible()
         paint_mesh.CHUNK_SEGMENTS = 128
         reference: Any = cast(Any, UsdGeom.Imageable)(stage.GetPrimAtPath("/World/Checks/Reference"))
@@ -136,7 +142,7 @@ async def run() -> None:
         report["no_dark_join_triangles"] = True
         report["orange_selection"] = True
         report["saved_material_refresh"] = True
-        report["long_zigzags_across_chunks"] = True
+        report["completed_strokes_remeshed_once"] = True
         report["passed"] = True
     except Exception:
         logging.getLogger(__name__).exception("Stroke quality regression failed")
