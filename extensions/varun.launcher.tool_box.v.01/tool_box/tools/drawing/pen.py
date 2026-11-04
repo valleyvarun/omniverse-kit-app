@@ -53,6 +53,8 @@ class PenInput:
 
     def __init__(self) -> None:
         self.pressure: float | None = None
+        # True while the latest mouse input was promoted from a finger; touch never draws.
+        self.touch: bool = False
         self.available: bool = False
         self._hwnd: int | None = None
         self._callback: Any = None
@@ -120,12 +122,15 @@ class PenInput:
                 elif pen.pointerInfo.pointerFlags & 4:
                     self.pressure = max(0.0, min(1.0, pen.pressure / 1024.0))
             elif message in (0x0200, 0x0201):
-                # Genuine mouse events must not reuse the previous pen's pressure.
                 extra: int = int(self._user32.GetMessageExtraInfo())
+                # Windows marks mouse input promoted from a finger with the touch signature.
+                self.touch = (extra & 0xFFFFFF80) == 0xFF515780
+                # Genuine mouse events must not reuse the previous pen's pressure.
                 if extra & 0xFFFFFF00 != 0xFF515700:
                     self.pressure = None
             elif message == 0x0008:  # KILLFOCUS
                 self.pressure = None
+                self.touch = False
         except Exception:
             LOGGER.exception("Could not read Windows Ink sample")
         return int(self._comctl32.DefSubclassProc(hwnd, message, wparam, lparam))
@@ -138,3 +143,4 @@ class PenInput:
         self._callback = None
         self.available = False
         self.pressure = None
+        self.touch = False

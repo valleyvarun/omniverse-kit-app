@@ -1,0 +1,71 @@
+-- glslfx version 0.1
+-- configuration
+{
+    "metadata": {"materialTag": "translucent"},
+    "parameters": {
+        "gridFar": {"default": 1000000.0},
+        "gridPhase1": {"default": [0.0, 0.0]},
+        "gridPhase2": {"default": [0.0, 0.0]},
+        "gridLevelBlend": {"default": 0.0},
+        "gridContrast": {"default": 1.0},
+        "gridAxisPosition": {"default": [0.0, 0.0]},
+        "gridAxisEnabled": {"default": [1.0, 1.0]},
+        "gridColor": {"default": [0.17, 0.17, 0.17]},
+        "gridAxisU": {"default": [0.40, 0.12, 0.12]},
+        "gridAxisV": {"default": [0.16, 0.37, 0.18]}
+    },
+    "attributes": {"gridCoord": {"type": "vec2"}},
+    "techniques": {"default": {"surfaceShader": {"source": ["Grid.Surface"]}}}
+}
+-- glsl Grid.Surface
+vec2 gridLineCoverage(vec2 coordinate, vec2 pixelWidth)
+{
+    // Preserve tiny coordinates near zero at coarse levels; subtracting 0.5 loses them.
+    vec2 distance = abs(coordinate - floor(coordinate + 0.5)) / pixelWidth;
+    vec2 coverage = 1.0 - smoothstep(vec2(0.0), vec2(1.0), distance);
+    // Fade the whole square grid together before either direction becomes too dense.
+    float footprint = max(pixelWidth.x, pixelWidth.y);
+    return coverage * (1.0 - smoothstep(0.125, 0.25, footprint));
+}
+
+vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+    vec2 coordinate = HdGet_gridCoord();
+    vec2 dx = dFdx(coordinate);
+    vec2 dy = dFdy(coordinate);
+    vec2 pixelWidth = max(sqrt(dx * dx + dy * dy), vec2(1e-6));
+    // Three world-aligned levels share one zoom transition, like Blender's viewport grid.
+    float blend = clamp(HdGet_gridLevelBlend(), 0.0, 1.0);
+    vec2 fine = gridLineCoverage(coordinate, pixelWidth) * (0.22 * (1.0 - blend));
+    vec2 medium = gridLineCoverage(coordinate * 0.1 + HdGet_gridPhase1(), pixelWidth * 0.1)
+                  * mix(0.5, 0.22, blend);
+    vec2 coarse = gridLineCoverage(coordinate * 0.01 + HdGet_gridPhase2(), pixelWidth * 0.01) * (0.5 * blend);
+    // Coincident levels contribute once, without thickening or darkening intersections.
+    vec2 lane = max(fine, max(medium, coarse));
+    lane = clamp(lane * HdGet_gridContrast(), vec2(0.0), vec2(1.0));
+    vec2 axisDistance = abs(coordinate - HdGet_gridAxisPosition()) / pixelWidth;
+    // Leave the colored axes' antialiased edges free of underlying gray lines.
+    lane *= mix(vec2(1.0), step(vec2(1.5), axisDistance), HdGet_gridAxisEnabled());
+    float opacity = max(lane.x, lane.y);
+    vec3 rgb = HdGet_gridColor() * opacity;
+
+    // Coordinate U is perpendicular to the V axis, and vice versa.
+    vec2 axes = (1.0 - smoothstep(vec2(0.0), vec2(1.0), axisDistance)) * HdGet_gridAxisEnabled();
+    float axisOpacity = max(axes.x, axes.y);
+    vec3 axisColor = axes.x > axes.y ? HdGet_gridAxisV() : HdGet_gridAxisU();
+    rgb = axisColor * axisOpacity + rgb * (1.0 - axisOpacity);
+    opacity = axisOpacity + opacity * (1.0 - axisOpacity);
+    // Grazing-angle fade keeps the horizon quiet while the grid continues under the camera.
+    bool orthographic = abs(GetProjectionMatrix()[3][3]) > 0.5;
+    vec3 facing = orthographic ? vec3(0.0, 0.0, 1.0) : normalize(-Peye.xyz);
+    float grazing = 1.0 - clamp(abs(dot(normalize(Neye), facing)), 0.0, 1.0);
+    float fade = 1.0 - grazing * grazing * grazing;
+    // Fade smoothly toward the camera's far clip, never at a lateral patch boundary.
+    float far = HdGet_gridFar();
+    float distance = orthographic ? max(-Peye.z, 0.0) : length(Peye.xyz);
+    fade *= 1.0 - smoothstep(far * 0.5, far, distance);
+    rgb *= fade;
+    opacity *= fade;
+    if (opacity < 0.005) discard;
+    return vec4(rgb, opacity);
+}

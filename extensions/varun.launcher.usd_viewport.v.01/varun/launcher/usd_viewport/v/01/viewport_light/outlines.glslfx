@@ -1,0 +1,38 @@
+-- glslfx version 0.1
+-- configuration
+{
+    "parameters": {"outlineColor": {"default": [0.0, 0.0, 0.0]}},
+    "techniques": {"default": {
+        "surfaceShader": {"source": ["Outline.Surface"]},
+        "displacementShader": {"source": ["Outline.Displacement"]}
+    }}
+}
+-- glsl Outline.Surface
+vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+    // Measure a subpixel line on the surface, independent of zoom and scale.
+#if HD_NUM_PRIMITIVE_VERTS == 3
+    vec3 coordinates = vec3(1.0 - patchCoord.x - patchCoord.y, patchCoord.xy);
+    vec3 distance = coordinates / max(fwidth(coordinates), vec3(1e-8));
+    // Suppress only diagonals introduced by Storm's polygon triangulation.
+    int mask = GetEdgeFlag();
+    if ((mask & 1) != 0) distance.y = 1e6;
+    if ((mask & 2) != 0) distance.z = 1e6;
+    float nearest = min(distance.x, min(distance.y, distance.z));
+#else
+    vec4 coordinates = vec4(patchCoord.xy, vec2(1.0) - patchCoord.xy);
+    vec4 distance = coordinates / max(fwidth(coordinates), vec4(1e-8));
+    float nearest = min(min(distance.x, distance.y), min(distance.z, distance.w));
+#endif
+    if (nearest > 0.55) discard;
+    return vec4(HdGet_outlineColor(), 1.0);
+}
+-- glsl Outline.Displacement
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{
+    mat4 projection = GetProjectionMatrix();
+    vec4 clip = projection * Peye;
+    // Reveal edges on their surface while keeping hidden surfaces occluded.
+    clip.z -= 0.000002 * clip.w;
+    return inverse(projection) * clip;
+}

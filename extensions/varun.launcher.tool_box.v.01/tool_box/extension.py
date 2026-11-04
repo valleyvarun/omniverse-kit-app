@@ -1,6 +1,7 @@
 """Start and stop the toolbox without owning the host app or viewport."""
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any, cast
 
 import omni.ext
@@ -11,6 +12,7 @@ from tool_box.core.controller import ToolController
 from tool_box.core.tool import Tool
 from tool_box.core.viewport import ViewportMonitor, get_active_stage
 from tool_box.shortcuts import WINDOW_TITLE, ShortcutManager
+from tool_box.tools.drawing import canvas, method_runtime
 from tool_box.tools.drawing.plane.geometry import PlaneRegistry
 from tool_box.tools.drawing.plane.selection import PlaneSelection
 from tool_box.tools.drawing.points.mesh import ensure_paint_material
@@ -37,11 +39,18 @@ class ToolBoxExtension(omni.ext.IExt):
         for name, tool in self._controller.tools.items():
             callbacks[name] = tool.activate
         callbacks["cancel"] = self._controller.cancel
+        axis: int
+        for axis in (0, 1, 2, 3):
+            callbacks[f"cursor_view_{axis}"] = partial(self._switch_view, axis)
         self._shortcuts = ShortcutManager(callbacks)
         self._monitor = ViewportMonitor(self._on_viewport_changed)
         self._menu = [menu_utils.MenuItemDescription(name=WINDOW_TITLE, onclick_fn=self._show)]
         cast(Any, menu_utils).add_menu_items(self._menu, "Window")
         omni.ui.Workspace.set_show_window_fn(WINDOW_TITLE, self._show)
+
+    @staticmethod
+    def _switch_view(axis: int) -> None:
+        method_runtime.switch_view(axis)
 
     def _show(self, visible: bool = True) -> None:
         if self._window is not None:
@@ -56,6 +65,8 @@ class ToolBoxExtension(omni.ext.IExt):
             ensure_paint_material(stage)
         if self._controller is not None:
             self._controller.cancel()
+            method_runtime.destroy()
+            canvas.destroy()
             self._controller.points.repairs.open_stage(stage)
         PlaneSelection.get().notify()
         if self._window is not None:

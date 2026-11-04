@@ -61,6 +61,7 @@ paths.exclude = ["*/_build", "*/bin", "*/__pycache__"]
 "omni.kit.viewport.ready" = {}
 "omni.kit.viewport.scene_camera_model" = {}
 "omni.kit.viewport.window" = {}
+"omni.timeline" = {}
 "omni.usd" = {}
 "omni.ui.scene" = {}
 

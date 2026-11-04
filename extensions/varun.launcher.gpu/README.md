@@ -1,6 +1,6 @@
 # New Launcher graphics startup
 
-Only `varun.new_launcher.kit` depends on this extension. Its startup order
+`varun.new_launcher.kit` and `3d-drawing.kit` use this extension. Its startup order
 (-200000) precedes Kit's renderer initialization (-100000). It has no GUI or
 renderer dependencies and cannot be hot reloaded.
 
@@ -17,10 +17,12 @@ Viewport Light remains the default in both cases. RTX still requires an NVIDIA
 GPU/driver supported by Kit's RTX renderer; vendor detection is not certification
 of older NVIDIA hardware.
 
-New Launcher initially resolves the raster Vulkan dependencies. Before device
+New Launcher bundles both Windows foundation shader caches and initially selects
+DirectX 12 on Windows so cached dependency filters match the NVIDIA backend.
+The launcher defers optional RTX packages through startup exclusions; the GPU
+bootstrap releases those exclusions only for eligible NVIDIA devices. Before device
 creation the bootstrap selects DirectX 12 for NVIDIA on Windows, and Vulkan for
-Linux and raster compatibility mode. The initial renderer list does not require
-RTX. On NVIDIA the viewport enables the
+Linux and raster compatibility mode. On NVIDIA the viewport enables the
 optional RTX extensions and adds RTX choices; without NVIDIA it leaves only
 Storm/Viewport Light. This is evaluated every launch, not saved as a machine
 capability in persistent preferences.

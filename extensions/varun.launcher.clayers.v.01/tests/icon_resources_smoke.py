@@ -11,11 +11,11 @@ from typing import Any
 
 import carb.settings
 import omni.kit.app
+import omni.kit.ui_test
+import omni.ui
 from clayers.extension import ClayersExtension
 from clayers.panel import ClayersPanel
 from clayers.stage_images import StageImages
-from omni import ui
-from omni.kit import ui_test
 from omni.kit.widget.stage.stage_icons import StageIcons
 from omni.kit.window.stage.stage_window import StageWindow
 from pxr import UsdGeom
@@ -37,23 +37,23 @@ async def run() -> None:
             await app.next_update_async()
 
     def stage_window() -> StageWindow:
-        window: ui.WindowHandle
-        for window in ui.Workspace.get_windows():
+        window: omni.ui.WindowHandle
+        for window in omni.ui.Workspace.get_windows():
             if isinstance(window, StageWindow):
                 return window
         raise AssertionError("Stage window missing")
 
     async def click(title: str, identifier: str = "", tooltip: str = "") -> None:
-        ui.Workspace.get_window(title).focus()
+        omni.ui.Workspace.get_window(title).focus()
         await settle(2)
         control: Any
-        for control in ui_test.find_all(f"{title}//Frame/**/InvisibleButton[*]"):
+        for control in omni.kit.ui_test.find_all(f"{title}//Frame/**/InvisibleButton[*]"):
             if (identifier and control.widget.identifier == identifier) or (
                 tooltip and control.widget.tooltip == tooltip
             ):
                 assert control.size.x > 0 and control.size.y > 0
                 # WidgetRef.click undocks windows, so click the actual docked hit target.
-                await ui_test.emulate_mouse_move_and_click(control.center)
+                await omni.kit.ui_test.emulate_mouse_move_and_click(control.center)
                 await settle()
                 return
         raise AssertionError(f"Control missing: {identifier or tooltip}")
@@ -63,7 +63,7 @@ async def run() -> None:
         settings: Any = carb.settings.get_settings()
         settings.set("/app/file/ignoreUnsavedOnExit", True)
         count: int = int(settings.get("/app/tests/iconStrokes") or 30)
-        ui.Workspace.set_dock_id_width(ui.Workspace.get_window("Clayers").dock_id, 340)
+        omni.ui.Workspace.set_dock_id_width(omni.ui.Workspace.get_window("Clayers").dock_id, 340)
         await settle()
         layers: ClayersExtension | None = None
         toolbox: ToolBoxExtension | None = None
@@ -100,6 +100,11 @@ async def run() -> None:
         await settle()
         children: list[Any] = list(stage.GetPrimAtPath("/World/ThreeDDraw").GetChildren())
         last_path: str = str(children[-1].GetPath())
+        owner: str | None = panel.model.group_for(last_path)
+        assert owner is not None
+        panel._expanded.add(panel.model.stroke_layer_key(owner))
+        panel.model.refresh()
+        await settle()
         panel._scroll.scroll_y = panel._scroll.scroll_y_max
         await settle()
         await click("Clayers", f"clayers_V:{last_path}")
@@ -139,9 +144,9 @@ async def run() -> None:
         await settle()
         tree.set_expanded(item, True, False)
         await settle()
-        ui.Workspace.show_window("Stage", False)
+        omni.ui.Workspace.show_window("Stage", False)
         await settle()
-        ui.Workspace.show_window("Stage", True)
+        omni.ui.Workspace.show_window("Stage", True)
         await settle()
         reopened_delegate: Any = stage_window().get_widget().get_delegate()
         assert reopened_delegate is not None

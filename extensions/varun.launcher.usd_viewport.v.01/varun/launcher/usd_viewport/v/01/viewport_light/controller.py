@@ -2,7 +2,7 @@
 
 # Python & library imports
 import asyncio
-import traceback
+import logging
 from typing import Any, cast
 
 # Omniverse & USD imports
@@ -16,6 +16,8 @@ from .display import StudioDisplay
 from .menu import LightMenu
 from .settings import ROOT, STORM
 from .studio import StudioRig
+
+LOGGER: logging.Logger = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------------
 # 1. VIEWPORT LIGHT
@@ -89,7 +91,7 @@ class ViewportLight:
         except Exception:
             self._release_appearance()
             self._settings.set(f"{ROOT}/active", False)
-            carb.log_error(f"Viewport Light could not activate: {traceback.format_exc()}")
+            LOGGER.exception("Viewport Light could not activate")
 
     # Match the studio display and rig to the active renderer.
     def _sync(self):
@@ -114,7 +116,7 @@ class ViewportLight:
             self._settings.set(f"{ROOT}/active", active)
         if active:
             # Install or refresh the custom backdrop and temporary light rig.
-            color = self._settings.get(f"{ROOT}/background")
+            color: Any = self._settings.get(f"{ROOT}/background")
             if self._display is None:
                 self._previous_display = self._window.viewport_widget.display_delegate
                 self._display = StudioDisplay(self._window.viewport_api, color)

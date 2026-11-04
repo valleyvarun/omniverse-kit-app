@@ -20,6 +20,7 @@ keywords = ["app"]  # That makes it browsable in UI with "app" filter
 # Both Windows graphics paths must have their core shader cache available
 # before adapter detection chooses DX12 (NVIDIA) or Vulkan (compatibility).
 "filter:platform"."windows-x86_64"."omni.gpu_foundation.shadercache.d3d12" = {}
+"filter:platform"."windows-x86_64"."omni.gpu_foundation.shadercache.vulkan" = {}
 "omni.kit.uiapp" = {}  # Base UI application
 "omni.kit.mainwindow" = {}  # Main window that hosts the menu bar
 "omni.kit.menu.utils" = {}  # Menu bar framework
@@ -40,6 +41,9 @@ keywords = ["app"]  # That makes it browsable in UI with "app" filter
 
 
 [settings]
+# Tool Box replaces these native groups; their unbuilt buttons have global hotkeys.
+exts."omni.kit.widget.toolbar".TransformButton.enabled = false
+exts."omni.kit.widget.toolbar".SelectionButton.enabled = false
 # Start the graphics device without requiring RTX on Intel/AMD systems.
 # Early GPU startup enables RTX capabilities on NVIDIA before device creation;
 # the viewport then loads the optional RTX engines only on an NVIDIA device.
@@ -49,8 +53,13 @@ renderer.active = "pxr"
 pxr.rendermode = "HdStormRendererPlugin"
 
 [settings.app]
-vulkan = true
+# Match the Windows NVIDIA backend before dependency filters are cached.
+vulkan = false
+"filter:platform"."linux-x86_64".vulkan = true
 launcher.autoGpu = true
+# Keep optional RTX packages out of the initial solver until GPU selection finishes.
+extensions.excluded = ["omni.hydra.rtx", "omni.kit.viewport.rtx"]
+launcher.deferRtx = true
 useFabricSceneDelegate = false
 font.file = "${fonts}/OpenSans-SemiBold.ttf"
 font.size = 18

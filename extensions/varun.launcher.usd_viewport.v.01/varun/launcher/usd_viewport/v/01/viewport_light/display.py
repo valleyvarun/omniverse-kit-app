@@ -8,10 +8,13 @@ from typing import Any
 import omni.usd
 from omni import ui
 from omni.kit.widget.viewport.display_delegate import ViewportDisplayDelegate
+from pxr import Gf, UsdGeom
 
 # Local imports
 from .depth_background import DepthBackground
 from .grid import StudioGrid
+from .outlines import GeometryOutlines
+from .solid import SolidShading
 
 # ----------------------------------------------------------------------
 # 1. STUDIO DISPLAY
@@ -28,28 +31,28 @@ class StudioDisplay(ViewportDisplayDelegate):
         self._frame: ui.Frame | None = None
         self._grid: StudioGrid | None = None
         self._depth_background: DepthBackground = DepthBackground(viewport_api)
+        self._solid_shading: SolidShading = SolidShading(viewport_api)
+        self._outlines: GeometryOutlines = GeometryOutlines(viewport_api, self._color)
         self._cover: ui.Rectangle | None = None
         self._stage_events: Any = None
         self._stage_ready: bool = False
         self._transition_held: bool = False
         self._pending_frames: int = 2
 
-    # Stack the studio backdrop, grid, and GPU-rendered scene.
+    # Present the depth-tested guides in the same GPU texture as the scene.
     def create(self, ui_frame: ui.Frame, prev_delegate: Any, *args: Any, **kwargs: Any) -> ui.ZStack:
-        # Draw the backdrop first, then the grid, then the scene texture.
+        # The backdrop shows through empty pixels in the scene texture.
         with ui_frame:
             stack: ui.ZStack = ui.ZStack()
             with stack:
                 backdrop: ui.Rectangle = ui.Rectangle(style={"background_color": ui.color(*self._color)})
-                grid_frame: ui.Frame = ui.Frame()
                 frame: ui.Frame = ui.Frame()
                 cover: ui.Rectangle = ui.Rectangle(style={"background_color": ui.color(*self._color)})
         # Delegate texture presentation to Kit's existing display implementation.
         super().create(frame, prev_delegate, *args, **kwargs)
         self._backdrop, self._frame = backdrop, frame
         self._cover = cover
-        with grid_frame:
-            self._grid = StudioGrid(self._api, self._color)
+        self._grid = StudioGrid(self._api, self._color)
         self._stage_ready = self._api.stage is not None
         self._stage_events = self._api.usd_context.get_stage_event_stream().create_subscription_to_pop(
             self._on_stage_event, name="Viewport Light display transition"
@@ -72,6 +75,10 @@ class StudioDisplay(ViewportDisplayDelegate):
     def _on_stage_event(self, event: Any) -> None:
         if event.type in (int(omni.usd.StageEventType.CLOSING), int(omni.usd.StageEventType.CLOSED)):
             self._depth_background.destroy()
+            self._solid_shading.destroy()
+            self._outlines.destroy()
+            if self._grid:
+                self._grid.clear_stage()
             self._stage_ready = False
             self._pending_frames = 2
             if self._cover is not None:
@@ -85,6 +92,7 @@ class StudioDisplay(ViewportDisplayDelegate):
         if rgba == self._color:
             return
         self._color = rgba
+        self._outlines.set_color(rgba)
         if self._backdrop:
             self._backdrop.style = {"background_color": ui.color(*color)}
         if self._grid:
@@ -105,8 +113,32 @@ class StudioDisplay(ViewportDisplayDelegate):
         if not self._stage_ready or viewport_api.stage is None:
             return self.size
         self._depth_background.update()
+        self._solid_shading.update()
+        self._outlines.update()
         if self._grid:
-            self._grid.update()
+            # Kit syncs api.view after this callback; use the incoming render frame.
+            frame_view: Gf.Matrix4d
+            if view is None:
+                camera: UsdGeom.Camera = UsdGeom.Camera(viewport_api.stage.GetPrimAtPath(viewport_api.camera_path))
+                frame_view = (
+                    camera.ComputeLocalToWorldTransform(viewport_api.time).GetInverse() if camera else viewport_api.view
+                )
+            else:
+                frame_view = Gf.Matrix4d(view) if isinstance(view, Gf.Matrix4d) else Gf.Matrix4d(*view)
+            # Kit's callback omits projection even when the render metadata has it.
+            projection_values: Any = projection
+            if projection_values is None:
+                projection_values = viewport_api.frame_info.get("projection")
+            frame_projection: Gf.Matrix4d = (
+                Gf.Matrix4d(viewport_api.projection)
+                if projection_values is None
+                else (
+                    Gf.Matrix4d(projection_values)
+                    if isinstance(projection_values, Gf.Matrix4d)
+                    else Gf.Matrix4d(*projection_values)
+                )
+            )
+            self._grid.update(frame_view, frame_projection)
         size: tuple[int, int] = super().update(viewport_api, texture, view, projection, presentation_key, metadata)
         if not self._transition_held:
             self._pending_frames = max(0, self._pending_frames - 1)
@@ -117,6 +149,8 @@ class StudioDisplay(ViewportDisplayDelegate):
     # Release the grid and display widgets.
     def destroy(self) -> None:
         self._depth_background.destroy()
+        self._solid_shading.destroy()
+        self._outlines.destroy()
         self._stage_events = None
         self._stage_ready = False
         if self._grid:

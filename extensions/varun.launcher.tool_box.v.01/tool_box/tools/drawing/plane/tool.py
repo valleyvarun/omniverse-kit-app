@@ -67,16 +67,20 @@ class DrawingPlane:
         # Bind a translucent UsdPreviewSurface so RTX renders the plane see-through.
         self._bind_translucent_material(stage, mesh, prim_path)
 
+        # The mesh lies in its local XZ plane (normal +Y). On Z-up stages, tip it
+        # 90 degrees about X with Kit's standard ops so it still lies flat.
+        normal: Gf.Vec3d = Gf.Vec3d(0.0, 1.0, 0.0)
+        if UsdGeom.GetStageUpAxis(stage) == UsdGeom.Tokens.z:
+            xformable: Any = UsdGeom.Xformable(mesh)
+            xformable.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.0, 0.0))
+            xformable.AddRotateXYZOp().Set(Gf.Vec3f(90.0, 0.0, 0.0))
+            xformable.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
+            normal = Gf.Vec3d(0.0, 0.0, 1.0)
+
         # Stash the plane's equation in memory so the cursor / 3D paint / 3D pipe tool
-        # can render and stamp on it. Mesh is built in local XZ plane at
-        # y=0, so the initial world (origin, normal) = ((0,0,0), (0,1,0)).
-        # PlaneRegistry.info_for_path() will re-derive these from the prim's
-        # world xform whenever the user moves or rotates the plane.
-        PlaneRegistry.register(
-            prim_path,
-            Gf.Vec3d(0.0, 0.0, 0.0),
-            Gf.Vec3d(0.0, 1.0, 0.0),
-        )
+        # can render and stamp on it. PlaneRegistry.info_for_path() will re-derive
+        # these from the prim's world xform whenever the user moves or rotates the plane.
+        PlaneRegistry.register(prim_path, Gf.Vec3d(0.0, 0.0, 0.0), normal)
 
         from tool_box.tools.drawing.plane.selection import PlaneSelection
 

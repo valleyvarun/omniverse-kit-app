@@ -14,6 +14,11 @@ from numpy.typing import NDArray
 from pxr import Sdf, Usd, UsdGeom, UsdShade, Vt
 
 from tool_box.tools.drawing.brush import SHAPES, BrushSample, BrushShape
+from tool_box.tools.drawing.points.canvas import (
+    CANVAS_PATH,
+    CanvasGeometry,
+    PaintCanvas,
+)
 from tool_box.tools.drawing.points.mesh import (
     PaintMesh,
     StrokePoint,
@@ -65,6 +70,9 @@ class PaintRepair:
     async def repair(self, stage: Any, path: str, cancellation: Event | None = None) -> bool:
         prim: Any = stage.GetPrimAtPath(path)
         if not prim or prim.GetAttribute("paint:surfaceVersion").Get() == 1:
+            return False
+        canvas: PaintCanvas | None = PaintCanvas.read(stage, prim)
+        if prim.GetAttribute(CANVAS_PATH).Get() and canvas is None:
             return False
         sources: list[Any] = []
         child: Any
@@ -145,6 +153,12 @@ class PaintRepair:
         cast(Any, UsdShade.MaterialBindingAPI).Apply(mesh.GetPrim()).Bind(material)
         source_writer: PaintMesh = PaintMesh(stage, path, right, up, shape)
         source_writer._write_source(mesh.GetPrim(), samples)
+        if canvas is not None:
+            projection: CanvasGeometry = await asyncio.to_thread(canvas.project_data, canvas.capture(mesh))
+            if (cancellation is not None and cancellation.is_set()) or not stage.GetPrimAtPath(path):
+                return False
+            if not canvas.apply(mesh, projection):
+                return False
         old_paths: list[Any] = [child.GetPath() for child in sources]
         with cast(Any, Usd).EditContext(stage, stage.GetRootLayer()):
             with cast(Any, Sdf).ChangeBlock():

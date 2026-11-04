@@ -11,8 +11,8 @@ from typing import Any, cast
 import carb.settings
 import omni.kit.app
 import omni.kit.renderer.capture
+import omni.kit.ui_test
 import omni.usd
-from omni.kit import ui_test
 from omni.kit.ui_test.input import (
     emulate_key_combo,
     emulate_mouse_drag_and_drop,
@@ -57,7 +57,7 @@ async def run() -> None:
         viewport.viewport_api.camera_path = "/Camera"
         await settle(25)
         viewport.focus()
-        await emulate_mouse_move(ui_test.Vec2(380, 330), human_delay_speed=100)
+        await emulate_mouse_move(omni.kit.ui_test.Vec2(380, 330), human_delay_speed=100)
         await settle()
         context.get_selection().set_selected_prim_paths(["/World/Cube"], True)
         await settle()
@@ -69,11 +69,13 @@ async def run() -> None:
 
         key: str
         prim_type: str
-        for key, prim_type in (("D", "Xform"), ("SHIFT+D", "Xform")):
+        for key, prim_type in (("B", "Xform"), ("SHIFT+D", "Xform")):
             await emulate_key_combo(key, human_delay_speed=100)
             await settle()
-            assert tools.points._is_active if key == "D" else tools.curves._is_active
-            await emulate_mouse_drag_and_drop(ui_test.Vec2(300, 350), ui_test.Vec2(480, 380), human_delay_speed=100)
+            assert tools.points._is_active if key == "B" else tools.curves._is_active
+            await emulate_mouse_drag_and_drop(
+                omni.kit.ui_test.Vec2(300, 350), omni.kit.ui_test.Vec2(480, 380), human_delay_speed=100
+            )
             await settle()
             parent = stage.GetPrimAtPath("/World/ThreeDDraw")
             assert parent and any(prim.GetTypeName() == prim_type for prim in parent.GetChildren()), prim_type

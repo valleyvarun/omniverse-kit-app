@@ -2,7 +2,7 @@
 (
     defaultPrim = "World"
     metersPerUnit = 1
-    upAxis = "Y"
+    upAxis = "Z"
 )
 
 def Xform "World"

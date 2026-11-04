@@ -69,6 +69,14 @@ def check_ink_messages() -> None:
     user32.extra = 0
     pen._message(0, 0x200, 0, 0, 0, 0)
     assert pen.pressure is None
+    # Mouse input promoted from a finger is flagged so it can never draw.
+    assert not pen.touch
+    user32.extra = 0xFF515780
+    pen._message(0, 0x201, 0, 0, 0, 0)
+    assert pen.touch
+    user32.extra = 0xFF515700
+    pen._message(0, 0x200, 0, 0, 0, 0)
+    assert not pen.touch
 
 
 def check_geometry() -> dict[str, object]:
@@ -233,6 +241,8 @@ async def run() -> None:
         registry.execute_action("tool_box", "draw_curves")
         await settle()
         assert set(panel._models) == {"size"}
+        assert cfg.brush_radius == cfg.BRUSH_RADIUS_DEFAULT and cfg.shape == "circle"
+        assert cfg.hardness == cfg.opacity == 1.0 and not any(cfg.pressure.values())
         report["tool_specific_settings"] = True
         await capture("pipe_controls")
         for index, shape in enumerate(SHAPES):
@@ -255,10 +265,11 @@ async def run() -> None:
         await capture("brush_shapes")
         stage.GetRootLayer().Export(str(output / "brush_shapes.usda"))
         stage.RemovePrim("/World/ThreeDDraw")
+        registry.execute_action("tool_box", "draw_points")
+        await settle()
         cfg.set_shape("circle")
         cfg.set_brush_radius(4.0)
         cfg.set_hardness(0.5)
-        registry.execute_action("tool_box", "draw_points")
         await settle()
         viewport.focus()
         bounds: Any = viewport.frame

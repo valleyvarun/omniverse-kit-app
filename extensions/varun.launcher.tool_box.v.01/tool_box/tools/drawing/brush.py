@@ -1,17 +1,18 @@
-"""Shared brush settings and per-sample pressure evaluation."""
+"""Independent tool profiles and per-sample pressure evaluation."""
 
 from __future__ import annotations
 
 import logging
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar, Literal, TypeAlias
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 BrushShape: TypeAlias = Literal["circle", "square", "triangle"]
 BrushKind: TypeAlias = Literal["paint", "pipe"]
 PressureTarget: TypeAlias = Literal["size", "hardness", "opacity"]
+BrushFloatSetting: TypeAlias = Literal["brush_radius", "hardness", "opacity"]
 SHAPES: tuple[BrushShape, ...] = ("circle", "square", "triangle")
 
 
@@ -34,6 +35,19 @@ class BrushSample:
         )
 
 
+def _pressure_defaults() -> dict[PressureTarget, bool]:
+    return {"size": False, "hardness": False, "opacity": False}
+
+
+@dataclass
+class BrushSettings:
+    brush_radius: float
+    hardness: float = 1.0
+    opacity: float = 1.0
+    shape: BrushShape = "circle"
+    pressure: dict[PressureTarget, bool] = field(default_factory=_pressure_defaults)
+
+
 class BrushConfig:
     BRUSH_RADIUS_DEFAULT: float = 2.0
     BRUSH_RADIUS_MIN: float = 0.5
@@ -42,11 +56,11 @@ class BrushConfig:
     _instance: ClassVar[BrushConfig | None] = None
 
     def __init__(self) -> None:
-        self.brush_radius: float = self.BRUSH_RADIUS_DEFAULT
-        self.hardness: float = 1.0
-        self.opacity: float = 1.0
-        self.shape: BrushShape = "circle"
-        self.pressure: dict[PressureTarget, bool] = {"size": False, "hardness": False, "opacity": False}
+        self._profiles: dict[BrushKind, BrushSettings] = {
+            "paint": BrushSettings(self.BRUSH_RADIUS_DEFAULT),
+            "pipe": BrushSettings(self.BRUSH_RADIUS_DEFAULT),
+        }
+        self._selected_tool: BrushKind = "paint"
         self.active_tool: BrushKind | None = None
         self._listeners: list[Callable[[], None]] = []
 
@@ -55,6 +69,34 @@ class BrushConfig:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @property
+    def current_tool(self) -> BrushKind:
+        return self._selected_tool
+
+    @property
+    def _settings(self) -> BrushSettings:
+        return self._profiles[self._selected_tool]
+
+    @property
+    def brush_radius(self) -> float:
+        return self._settings.brush_radius
+
+    @property
+    def hardness(self) -> float:
+        return self._settings.hardness
+
+    @property
+    def opacity(self) -> float:
+        return self._settings.opacity
+
+    @property
+    def shape(self) -> BrushShape:
+        return self._settings.shape
+
+    @property
+    def pressure(self) -> dict[PressureTarget, bool]:
+        return self._settings.pressure
 
     @property
     def active(self) -> bool:
@@ -71,6 +113,8 @@ class BrushConfig:
     def set_active(self, value: bool, tool: BrushKind = "paint") -> None:
         selected: BrushKind | None = tool if value else None
         if selected != self.active_tool:
+            if selected is not None:
+                self._selected_tool = selected
             self.active_tool = selected
             self._notify()
 
@@ -83,15 +127,15 @@ class BrushConfig:
     def set_opacity(self, value: float) -> None:
         self._set_float("opacity", value, 0.0, 1.0)
 
-    def _set_float(self, name: str, value: float, lo: float, hi: float) -> None:
+    def _set_float(self, name: BrushFloatSetting, value: float, lo: float, hi: float) -> None:
         value = self._clamp(value, lo, hi)
-        if abs(float(getattr(self, name)) - value) > 1e-6:
-            setattr(self, name, value)
+        if abs(float(getattr(self._settings, name)) - value) > 1e-6:
+            setattr(self._settings, name, value)
             self._notify()
 
     def set_shape(self, shape: BrushShape) -> None:
         if shape in SHAPES and shape != self.shape:
-            self.shape = shape
+            self._settings.shape = shape
             self._notify()
 
     def set_pressure(self, target: PressureTarget, enabled: bool) -> None:

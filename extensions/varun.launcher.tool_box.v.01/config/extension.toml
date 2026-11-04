@@ -28,6 +28,14 @@ readme = "docs/README.md"
 "omni.kit.manipulator.selection" = {}
 "omni.kit.pip_archive" = {}
 
+[settings]
+# Preserve defaults formerly seeded by the hidden native toolbar groups.
+app.transform.moveMode = "global"
+app.transform.rotateMode = "global"
+persistent.app.viewport.pickingMode = "type:ALL"
+persistent.app.viewport.pickingModeNoKinds = true
+persistent.app.viewport.pickingModeIncludeRef = true
+
 # ----------------------------------------------------------------------
 # 3. PYTHON ENTRY POINT
 # ----------------------------------------------------------------------

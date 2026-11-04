@@ -20,7 +20,7 @@ from omni.kit.viewport.utility import (
 )
 from omni.kit.widget.prompt import PromptButtonInfo, PromptManager
 from omni.kit.window.file_exporter import get_file_exporter
-from pxr import Sdf, Usd, UsdUtils
+from pxr import Sdf, Usd, UsdGeom, UsdUtils
 
 # ----------------------------------------------------------------------
 # 1. CONSTANTS & CONFIGURATION
@@ -289,6 +289,10 @@ class MyExtension(omni.ext.IExt):
         # create an in-memory stage with the sample file as a sublayer
         stage: Usd.Stage = Usd.Stage.CreateInMemory()
         stage.GetRootLayer().subLayerPaths.append(str(SAMPLE_USD_PATH))
+
+        # use Kit's default up axis like new stages do (the viewport extension makes it Z)
+        up_axis: Any = carb.settings.get_settings().get("/persistent/app/stage/upAxis")
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y if up_axis == "Y" else UsdGeom.Tokens.z)
 
         # preset the new stage's lighting mode to the default rig
         stage_id: int = UsdUtils.StageCache.Get().Insert(stage).ToLongInt()

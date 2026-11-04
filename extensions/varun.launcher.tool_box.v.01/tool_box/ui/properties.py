@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from functools import partial
 
 # --- Standard library imports ---------------------------------------------
 # `typing` for static-analysis friendliness.
@@ -101,31 +103,52 @@ def build_xyz_row(
     initial: tuple[float, float, float],
     step: float,
     on_changed: Callable[[int, float], None],
-) -> tuple[list[Any], list[Any]]:
+    *,
+    stacked: bool | None = None,
+    identifier: str = "transform",
+) -> tuple[list[omni.ui.AbstractValueModel], list[Any]]:
     # Output collectors (one entry per axis).
-    models: list[Any] = []
+    models: list[omni.ui.AbstractValueModel] = []
     subs: list[Any] = []
     # Stack axes in narrow windows; preserve the horizontal launcher controls.
-    sidebar: bool = use_stacked_settings()
+    sidebar: bool = use_stacked_settings() if stacked is None else stacked
     stack_type: type[omni.ui.Stack] = omni.ui.VStack if sidebar else omni.ui.HStack
     with stack_type(spacing=8, height=0 if sidebar else 24):
         if not sidebar:
             omni.ui.Spacer(width=8)
-        omni.ui.Label(label, width=70, height=24)
+        omni.ui.Label(label, width=omni.ui.Fraction(1) if sidebar else omni.ui.Pixel(90), height=24)
         # Iterate over (X, Y, Z) along with their colors.
         axis_idx: int
         axis: str
         color: int
         for axis_idx, (axis, color) in enumerate(zip(AXIS_LABELS, AXIS_COLORS)):
-            # Per-axis sub-stack: colored letter label + drag field.
-            with omni.ui.HStack(spacing=2, width=omni.ui.Fraction(1) if sidebar else omni.ui.Pixel(140), height=24):
+            # Buttons share the field model, including its normal undo callback.
+            with omni.ui.HStack(spacing=2, width=omni.ui.Fraction(1) if sidebar else omni.ui.Pixel(155), height=24):
                 omni.ui.Label(axis, width=14, style={"color": color, "font_size": 14})
+                model: omni.ui.SimpleFloatModel = omni.ui.SimpleFloatModel(initial[axis_idx])
+                omni.ui.Button(
+                    "-",
+                    width=18,
+                    style={"padding": 0, "font_size": 10},
+                    identifier=f"{identifier}_{axis.lower()}_decrease",
+                    tooltip=f"Decrease {axis} by {step:g}",
+                    clicked_fn=partial(step_value, model, -step),
+                )
                 # FloatDrag = field you can also drag horizontally to change.
-                field: omni.ui.FloatDrag = omni.ui.FloatDrag(min=-1e9, max=1e9, step=step)
-                field.model.set_value(initial[axis_idx])
+                field: omni.ui.FloatDrag = omni.ui.FloatDrag(
+                    model, min=-1e9, max=1e9, step=step, identifier=f"{identifier}_{axis.lower()}"
+                )
+                omni.ui.Button(
+                    "+",
+                    width=18,
+                    style={"padding": 0, "font_size": 10},
+                    identifier=f"{identifier}_{axis.lower()}_increase",
+                    tooltip=f"Increase {axis} by {step:g}",
+                    clicked_fn=partial(step_value, model, step),
+                )
 
                 # Bind the axis before subscribing to later edits.
-                def changed(model: Any, index: int = axis_idx) -> None:
+                def changed(model: omni.ui.AbstractValueModel, index: int = axis_idx) -> None:
                     on_changed(index, model.get_value_as_float())
 
                 sub: Any = field.model.subscribe_value_changed_fn(changed)
@@ -135,3 +158,10 @@ def build_xyz_row(
         if not sidebar:
             omni.ui.Spacer()
     return models, subs
+
+
+def step_value(model: omni.ui.AbstractValueModel, step: float) -> None:
+    """Apply one button step without accumulating decimal rounding noise."""
+    value: float = model.get_value_as_float()
+    if math.isfinite(value):
+        model.set_value(max(-1e9, min(1e9, round(value + step, 9))))

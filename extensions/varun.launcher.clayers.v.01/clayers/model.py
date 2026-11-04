@@ -17,6 +17,7 @@ from tool_box.tools.drawing.settings import DRAW_ROOT
 GROUPS_KEY: str = "varun_launcher_groups"
 LOCK_KEY: str = "lockedByLauncher"
 ROOT_GROUP: str = "__root__"
+STROKE_LAYER_PREFIX: str = "__stroke_layer__:"
 
 
 @dataclass
@@ -27,6 +28,8 @@ class Group:
     active: bool = False
     visible: bool = True
     locked: bool = False
+    stroke_visible: bool = True
+    stroke_locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -128,6 +131,8 @@ class CommunicationLayers:
                 active=bool(value.get("active", False)),
                 visible=bool(value.get("visible", True)),
                 locked=bool(value.get("locked", False)),
+                stroke_visible=bool(value.get("stroke_visible", True)),
+                stroke_locked=bool(value.get("stroke_locked", False)),
             )
 
     def _persist(self) -> None:
@@ -145,6 +150,8 @@ class CommunicationLayers:
                 "active": group.active,
                 "visible": group.visible,
                 "locked": group.locked,
+                "stroke_visible": group.stroke_visible,
+                "stroke_locked": group.stroke_locked,
             }
         data[GROUPS_KEY] = snapshot
         self.stage.GetRootLayer().customLayerData = data
@@ -159,6 +166,58 @@ class CommunicationLayers:
                 if not prim.GetName().startswith("_") and prim.GetTypeName() not in ("Material", "Shader"):
                     result.append(str(prim.GetPath()))
         return result
+
+    @staticmethod
+    def stroke_layer_key(group: str) -> str:
+        return STROKE_LAYER_PREFIX + group
+
+    def layer_group(self, key: str) -> str | None:
+        if not key.startswith(STROKE_LAYER_PREFIX):
+            return None
+        group: str = key[len(STROKE_LAYER_PREFIX) :]
+        return group if group == ROOT_GROUP or group in self.groups else None
+
+    @staticmethod
+    def is_stroke(path: str) -> bool:
+        return path.startswith(DRAW_ROOT + "/")
+
+    def stroke_paths(self, group: str) -> list[str]:
+        candidates: list[str] = self.paths(DRAW_ROOT) if group == ROOT_GROUP else self.groups[group].members
+        result: list[str] = []
+        path: str
+        for path in candidates:
+            if (
+                self.is_stroke(path)
+                and self.stage is not None
+                and self.stage.GetPrimAtPath(path)
+                and (group != ROOT_GROUP or self.group_for(path) is None)
+            ):
+                result.append(path)
+        return result
+
+    def row_paths(self, key: str) -> list[str]:
+        if key in self.groups:
+            return self.group_paths(key)
+        group: str | None = self.layer_group(key)
+        return self.stroke_paths(group) if group is not None else [key]
+
+    def _member_visible(self, path: str) -> bool:
+        owner: str | None = self.group_for(path)
+        if (
+            owner is not None
+            and owner in self.groups
+            and self.is_stroke(path)
+            and not self.groups[owner].stroke_visible
+        ):
+            return False
+        seen: set[str] = set()
+        while owner in self.groups and owner not in seen:
+            assert owner is not None
+            seen.add(owner)
+            if not self.groups[owner].visible:
+                return False
+            owner = self.groups[owner].parent
+        return True
 
     def group_for(self, path: str) -> str | None:
         key: str
@@ -194,7 +253,20 @@ class CommunicationLayers:
         return False
 
     def locked(self, path: str) -> bool:
-        if self.group_locked(self.group_for(path)):
+        layer_owner: str | None = self.layer_group(path)
+        if layer_owner is not None:
+            if layer_owner in self.groups:
+                return self.group_locked(layer_owner) or self.groups[layer_owner].stroke_locked
+            paths: list[str] = self.stroke_paths(ROOT_GROUP)
+            member: str
+            for member in paths:
+                if not self.locked(member):
+                    return False
+            return bool(paths)
+        owner: str | None = self.group_for(path)
+        if self.group_locked(owner):
+            return True
+        if owner is not None and owner in self.groups and self.is_stroke(path) and self.groups[owner].stroke_locked:
             return True
         prim: Any = self.stage.GetPrimAtPath(path) if self.stage is not None and path.startswith("/") else None
         while prim and not prim.IsPseudoRoot():
@@ -241,6 +313,15 @@ class CommunicationLayers:
             self.context.get_selection().set_selected_prim_paths(kept, False)
 
     def visible(self, path: str) -> bool:
+        layer_owner: str | None = self.layer_group(path)
+        if layer_owner is not None:
+            if layer_owner in self.groups:
+                return self.groups[layer_owner].stroke_visible
+            member: str
+            for member in self.stroke_paths(ROOT_GROUP):
+                if self.visible(member):
+                    return True
+            return False
         prim: Any = self.stage.GetPrimAtPath(path) if self.stage is not None else None
         imageable: Any = cast(Any, UsdGeom).Imageable(prim) if prim else None
         return bool(imageable and imageable.ComputeVisibility() != UsdGeom.Tokens.invisible)
@@ -249,10 +330,16 @@ class CommunicationLayers:
         if self.stage is None:
             return
         paths: list[str] = [key]
+        owner: str | None
         if key in self.groups:
             self.groups[key].visible = visible
             paths = self.group_paths(key)
             self._persist()
+        elif (owner := self.layer_group(key)) is not None:
+            paths = self.stroke_paths(owner)
+            if owner in self.groups:
+                self.groups[owner].stroke_visible = visible
+                self._persist()
         elif self.locked(key):
             return
         path: str
@@ -260,16 +347,28 @@ class CommunicationLayers:
             prim: Any = self.stage.GetPrimAtPath(path)
             imageable: Any = cast(Any, UsdGeom).Imageable(prim) if prim else None
             if imageable:
-                imageable.GetVisibilityAttr().Set(UsdGeom.Tokens.inherited if visible else UsdGeom.Tokens.invisible)
+                inherited: bool = visible and self._member_visible(path)
+                imageable.GetVisibilityAttr().Set(UsdGeom.Tokens.inherited if inherited else UsdGeom.Tokens.invisible)
         self.refresh()
 
     def toggle_lock(self, key: str) -> None:
+        owner: str | None
         if self.stage is None:
             return
         if key in self.groups:
             if not self.group_locked(self.groups[key].parent):
                 self.groups[key].locked = not self.groups[key].locked
                 self._persist()
+        elif (owner := self.layer_group(key)) is not None:
+            if owner in self.groups:
+                if not self.group_locked(owner):
+                    self.groups[owner].stroke_locked = not self.groups[owner].stroke_locked
+                    self._persist()
+            else:
+                locked: bool = not self.locked(key)
+                path: str
+                for path in self.stroke_paths(owner):
+                    self.stage.GetPrimAtPath(path).SetCustomDataByKey(LOCK_KEY, locked)
         elif not self.group_locked(self.group_for(key)):
             prim: Any = self.stage.GetPrimAtPath(key)
             if prim:
@@ -286,7 +385,7 @@ class CommunicationLayers:
                 if group.parent == parent:
                     group.active = group is self.groups[key]
             self._persist()
-        else:
+        elif self.layer_group(key) is None:
             self.planes.set_active_plane(key)
 
     def create_group(
@@ -342,15 +441,33 @@ class CommunicationLayers:
                 break
             destination = parent = destination_next
         if added and destination is not None:
-            self.groups[destination].members.extend(sorted(added))
+            path: str
+            for path in sorted(added):
+                if self.group_for(path) is None:
+                    self.groups[destination].members.append(path)
+                if not self._member_visible(path):
+                    imageable: Any = cast(Any, UsdGeom).Imageable(self.stage.GetPrimAtPath(path))
+                    if imageable:
+                        imageable.GetVisibilityAttr().Set(UsdGeom.Tokens.invisible)
             self._persist()
 
-    # Tree rows preserve the old ground-plane, group, plane, and stroke ordering.
+    # Stroke layers are virtual rows; their USD paths and group membership stay unchanged.
     def rows(self, expanded: set[str]) -> list[Row]:
         if self.stage is None:
             return []
         result: list[Row] = [Row(DEFAULT_GROUND_PLANE_PATH, "Ground Plane", "Plane")]
         visited: set[str] = set()
+
+        def emit_strokes(group_key: str, depth: int) -> None:
+            paths: list[str] = self.stroke_paths(group_key)
+            if not paths:
+                return
+            layer: str = self.stroke_layer_key(group_key)
+            result.append(Row(layer, "Strokes", "Stroke Layer", depth))
+            if layer in expanded:
+                path: str
+                for path in paths:
+                    result.append(Row(path, self.stage.GetPrimAtPath(path).GetName(), "Stroke", depth + 1))
 
         def emit(key: str, depth: int) -> None:
             if key in visited:
@@ -368,23 +485,21 @@ class CommunicationLayers:
             path: str
             for path in group.members:
                 prim: Any = self.stage.GetPrimAtPath(path)
-                if prim:
-                    result.append(
-                        Row(path, prim.GetName(), "Plane" if path.startswith(PLANE_ROOT + "/") else "Stroke", depth + 1)
-                    )
+                if prim and not self.is_stroke(path):
+                    kind: str = "Plane" if path.startswith(PLANE_ROOT + "/") else str(prim.GetTypeName() or "Object")
+                    result.append(Row(path, prim.GetName(), kind, depth + 1))
+            emit_strokes(key, depth + 1)
 
         key: str
         group: Group
         for key, group in self.groups.items():
             if group.parent not in self.groups:
                 emit(key, 0)
-        root: str
-        kind: str
         path: str
-        for root, kind in ((PLANE_ROOT, "Plane"), (DRAW_ROOT, "Stroke")):
-            for path in self.paths(root):
-                if self.group_for(path) is None:
-                    result.append(Row(path, path.rsplit("/", 1)[-1], kind))
+        for path in self.paths(PLANE_ROOT):
+            if self.group_for(path) is None:
+                result.append(Row(path, path.rsplit("/", 1)[-1], "Plane"))
+        emit_strokes(ROOT_GROUP, 0)
         return result
 
     def destroy(self) -> None:

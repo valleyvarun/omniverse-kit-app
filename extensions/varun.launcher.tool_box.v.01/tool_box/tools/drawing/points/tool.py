@@ -15,6 +15,7 @@ from tool_box.core.tool import Tool
 from tool_box.core.viewport import get_active_stage, get_active_usd_context
 from tool_box.tools.drawing.brush import BrushConfig
 from tool_box.tools.drawing.cursor import Cursor3D
+from tool_box.tools.drawing.points.canvas import PaintCanvas, SurfacePaintMesh
 from tool_box.tools.drawing.points.mesh import PaintMesh
 from tool_box.tools.drawing.points.repair import PaintRepair
 from tool_box.tools.drawing.settings import (
@@ -86,11 +87,16 @@ class ThreeDDrawTool:
             return
         if get_active_stage() is None:
             return
+        from tool_box.tools.drawing.method_runtime import cancel_placement
+
+        cancel_placement()
         self._is_active = True
         if self._tool is not None:
             self._tool.set_active(True)
         self._clear_selection()
         self._viewport_suppression.enter()
+        cfg: BrushConfig = BrushConfig.get()
+        cfg.set_active(True, "paint")
         self._cursor = Cursor3D()
         self._cursor.show()
         self._cursor.set_listener(
@@ -99,8 +105,6 @@ class ThreeDDrawTool:
             on_end=self._on_draw_end,
         )
         # Tell the Tool Properties panel we're active and listen for slider edits.
-        cfg: BrushConfig = BrushConfig.get()
-        cfg.set_active(True, "paint")
         self._brush_listener = self._on_brush_config_changed
         cfg.add_listener(self._brush_listener)
 
@@ -155,8 +159,22 @@ class ThreeDDrawTool:
         if scene is not None:
             right = (float(scene._basis_r[0]), float(scene._basis_r[1]), float(scene._basis_r[2]))
             up = (float(scene._basis_u[0]), float(scene._basis_u[1]), float(scene._basis_u[2]))
-        self._mesh = PaintMesh(self._stroke_stage, LIVE_STROKE_PATH, right, up, BrushConfig.get().shape)
-        self._mesh.add(pos, Cursor3D.sample())
+        canvas: PaintCanvas | None = None
+        if scene is not None and scene.draw_on_surface and scene.surface_path:
+            canvas = PaintCanvas.create(
+                self._stroke_stage,
+                scene.surface_path,
+                pos,
+                scene.projection_normal,
+                BrushConfig.get().brush_radius,
+            )
+        mesh: PaintMesh
+        if canvas is not None:
+            mesh = SurfacePaintMesh(self._stroke_stage, LIVE_STROKE_PATH, right, up, BrushConfig.get().shape, canvas)
+        else:
+            mesh = PaintMesh(self._stroke_stage, LIVE_STROKE_PATH, right, up, BrushConfig.get().shape)
+        self._mesh = mesh
+        mesh.add(pos, Cursor3D.sample())
         self._dirty = True
         self._drawing = True
         self._accum = EMIT_INTERVAL

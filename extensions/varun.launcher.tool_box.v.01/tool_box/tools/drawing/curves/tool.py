@@ -19,6 +19,7 @@ from tool_box.core.viewport import get_active_stage, get_active_usd_context
 from tool_box.tools.drawing.brush import BrushConfig
 from tool_box.tools.drawing.cursor import Cursor3D
 from tool_box.tools.drawing.curves.mesh import PipeMesh, Vec3
+from tool_box.tools.drawing.curves.surface import SurfacePipeMesh
 from tool_box.tools.drawing.plane.geometry import PlaneRegistry
 from tool_box.tools.drawing.plane.selection import (
     DEFAULT_GROUND_PLANE_PATH,
@@ -99,11 +100,16 @@ class ThreeDDrawCurvesTool:
             return
         if get_active_stage() is None:
             return
+        from tool_box.tools.drawing.method_runtime import cancel_placement
+
+        cancel_placement()
         self._is_active = True
         if self._tool is not None:
             self._tool.set_active(True)
         self._clear_selection()
         self._viewport_suppression.enter()
+        cfg: BrushConfig = BrushConfig.get()
+        cfg.set_active(True, "pipe")
         self._cursor = Cursor3D()
         self._cursor.show()
         self._cursor.set_listener(
@@ -111,8 +117,6 @@ class ThreeDDrawCurvesTool:
             on_change=self._on_draw_change,
             on_end=self._on_draw_end,
         )
-        cfg: BrushConfig = BrushConfig.get()
-        cfg.set_active(True, "pipe")
         self._brush_listener = self._on_brush_config_changed
         cfg.add_listener(self._brush_listener)
 
@@ -172,7 +176,10 @@ class ThreeDDrawCurvesTool:
             info: Any = PlaneRegistry.info_for_path(path, viewport_api)
             if info is not None:
                 normal = (float(info[1][0]), float(info[1][1]), float(info[1][2]))
-        self._mesh = PipeMesh(
+        if scene is not None:
+            normal = (float(scene._normal[0]), float(scene._normal[1]), float(scene._normal[2]))
+        mesh_type: type[PipeMesh] = SurfacePipeMesh if scene is not None and scene.draw_on_surface else PipeMesh
+        self._mesh = mesh_type(
             self._stroke_stage,
             LIVE_STROKE_PATH,
             pos,

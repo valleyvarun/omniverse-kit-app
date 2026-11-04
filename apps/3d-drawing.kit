@@ -17,6 +17,9 @@ keywords = ["app"]
 "omni.kit.window.stage" = {}
 
 [settings]
+# Tool Box replaces these native groups; their unbuilt buttons have global hotkeys.
+exts."omni.kit.widget.toolbar".TransformButton.enabled = false
+exts."omni.kit.widget.toolbar".SelectionButton.enabled = false
 # Load bundled extensions and scripts without online registry or user-folder discovery.
 app.extensions.registryEnabled = false
 app.extensions.excluded = ["omni.hydra.rtx", "omni.kit.viewport.rtx"]

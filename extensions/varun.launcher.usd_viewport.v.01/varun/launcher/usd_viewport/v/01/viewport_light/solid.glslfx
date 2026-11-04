@@ -1,0 +1,36 @@
+-- glslfx version 0.1
+-- configuration
+{
+    "parameters": {
+        "studioUp": {"default": [0.0, 0.0, 1.0]},
+        "studioMetersPerUnit": {"default": 0.01}
+    },
+    "techniques": {"default": {
+        "surfaceShader": {"source": ["Studio.Surface"]},
+        "displacementShader": {"source": ["Studio.Displacement"]}
+    }}
+}
+-- glsl Studio.Surface
+vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+    // Keep Storm's normal lighting, display color and opacity.
+    color.rgb = FallbackLighting(Peye.xyz, Neye, color.rgb);
+    mat4 viewToWorld = GetWorldToViewInverseMatrix();
+    vec3 world = (viewToWorld * Peye).xyz;
+    vec3 camera = viewToWorld[3].xyz;
+    vec3 up = HdGet_studioUp();
+    // Scale continuously with the view, including tiny models and orthographic views.
+    float minimumScale = 0.0001 / max(HdGet_studioMetersPerUnit(), 1e-9);
+    float viewHeight = max(abs(dot(camera, up)), minimumScale);
+    float distance = length(Peye.xyz);
+    float height = dot(world, up);
+    float depthCue = distance / (distance + viewHeight);
+    float heightCue = height / (abs(height) + viewHeight * 0.25);
+    color.rgb *= 1.0 - 0.24 * depthCue + 0.22 * heightCue;
+    return color;
+}
+-- glsl Studio.Displacement
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{
+    return Peye;
+}

@@ -13,7 +13,7 @@ side. Other hosts retain the floating layout. The Python package remains
 | Move | M |
 | Rotate | R |
 | Scale | S |
-| 3D paint | D |
+| 3D paint | B |
 | 3D pipe | Shift+D |
 | Drawing Plane | Button only |
 | Cancel active tool | Esc |
@@ -28,10 +28,10 @@ selects Ground or a plane in the current stage. Creating a plane selects it.
 Move and rotate plane prims using the ordinary transform tools. Drawing strokes
 remain on the stage of the viewport where the drag began.
 
-Drawing contains 3D paint (teal brush/oval) and 3D pipe (orange brush/sphere). Method follows
-Drawing (below it in the sidebar) and contains the violet drawing-plane button.
-The three transparent PNGs and their generation prompts live in `data/icons`.
-Selecting a drawing or transform tool still shows only that tool and its settings.
+Drawing contains 3D paint (teal brush/oval) and 3D pipe (orange brush/sphere).
+Canvas follows Drawing and remains visible when a tool is selected. Its three
+buttons each have a checkbox underneath. PNG and colored SVG icons live in `data/icons`.
+Selecting a drawing or transform tool collapses the other tool buttons.
 
 Brush Size is the radius in stage units. 3D pipe creates a smooth-shaded, capped
 mesh at that radius, using the selected circle, square, or triangle cross section. Midpoint curves smooth cursor samples, and completed
@@ -41,9 +41,9 @@ small mesh sections underneath it. Existing saved strokes are left unchanged.
 
 ## Brush dynamics
 
-Both drawing tools offer Circle (default), Square, and Triangle shapes. **P** beside
-Brush Size toggles pressure; paint also has independent **P** toggles beside Hardness
-and Opacity. Blue means enabled. The slider value is the maximum at full pressure;
+Both drawing tools offer Circle (default), Square, and Triangle shapes. The white
+pen-and-rings icon beside Brush Size toggles pressure; paint also has independent
+pressure toggles beside Hardness and Opacity. Blue means enabled. The slider value is the maximum at full pressure;
 mouse input keeps the slider value. Pressure toggles start disabled.
 
 While a drawing tool is active, hold **Ctrl+Alt+LMB** and drag up/down to increase/decrease
@@ -53,6 +53,9 @@ releasing the modifiers resumes drawing. Narrow sidebars stack labels above cont
 Windows pressure uses Windows Ink pointer messages, without a device-specific SDK or
 additional Python packages. The driver must expose Windows Ink pressure. A remote
 screen connection must forward pen pressure; mouse-only forwarding cannot provide it.
+
+Touch never draws, places the 3D cursor, or adjusts the brush; use a pen or mouse. In the
+new launcher, touch navigates the viewport instead.
 
 Paint follows Grease Pencil's connected-stroke approach: a smoothed centerline becomes
 a thin ribbon of triangles, with shared joins and caps only at the ends. It does not
@@ -95,13 +98,43 @@ tool_box/
       curves/tool.py         3D pipe input and stroke lifecycle
       curves/mesh.py         Incremental smooth tube geometry
       plane/                 Plane creation, selection, and grid
-      brush.py               Shared brush state
+      brush.py               Independent paint and pipe brush profiles
       cursor.py              Viewport gestures and brush ring
       properties.py          Brush controls
       settings.py            Drawing defaults
       stroke_resampler.py    Stroke spacing
       viewport_suppression.py  Temporary input-layer changes
 ```
+
+## Shared canvas
+
+Brush size, shape, pressure, hardness, and opacity remain independent for each tool.
+Canvas choices are shared, always available, and absent from individual brush settings.
+There is no Methods category in the toolbox.
+
+- **Drawing plane**: its violet button creates a plane; its checkbox enables the
+  selected plane and shows the plane picker.
+- **Draw on object**: the colored brush/cube button or its checkbox enables drawing
+  on visible USD surfaces. With Drawing plane enabled too, the nearest hit wins.
+- **3D cursor**: click the colored cursor button, then click in the viewport to place
+  its construction origin. Placement works without a brush selected and does not
+  paint. The checkbox enables/disables drawing through that origin. Placement uses
+  the ground, enabled drawing plane, or enabled object surface. Esc cancels placement.
+
+With no canvas checked, drawing uses the ground plane. With 3D cursor checked, the
+viewport keys `1`, `2`, and `3` select planes through its position perpendicular to
+X, Y, and Z. Repeat a key to view the opposite side; `0` restores perspective and
+keeps the last construction plane. Shared buttons provide the same view actions.
+
+Object projection and ray queries run locally against USD geometry. Construction
+cameras live only in the session layer. These features do not require RTX, a server,
+or downloaded packages. Existing flat paint remeshing and pipe geometry remain the
+default paths; surface drawing uses adapters around them.
+
+Clayers collects each group's strokes under a collapsed **Stroke Layer**. Expand
+it to select individual strokes, or select the layer to select all its strokes.
+Layer visibility and locking also apply to strokes subsequently added to that group.
+The layer is an organizational row; it does not move or rename saved USD strokes.
 
 ## Add to another app
 
@@ -149,3 +182,11 @@ is separate from these automated checks.
 loops in all three brush shapes. It also injects slow mouse gestures and stationary
 holds into a disposable app without moving the desktop cursor. Enable `omni.kit.ui_test`
 and `omni.kit.renderer.capture`; results and captures go to `_build/slow_stroke_checks/final`.
+
+`tests/drawing_features.py` exercises actual mouse drags and number-key input for
+independent brushes, axes spokes, cursor placement, surface drawing, temporary-camera
+cleanup, and narrow/wide controls. Run it in a disposable app capped at 30 FPS with
+`omni.kit.ui_test` and `omni.kit.renderer.capture`; artifacts go to
+`_build/shared_canvas_checks/kit`. The CPU tests `brush_profiles.py`,
+`drawing_methods.py`, `surface_queries.py`, and `surface_paint.py` cover the numerical
+and USD behavior without a renderer. Clayers includes `tests/stroke_layers.py`.

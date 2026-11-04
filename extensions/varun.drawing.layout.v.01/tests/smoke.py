@@ -102,7 +102,13 @@ async def run() -> None:
         assert extension is not None and extension._controller is not None and extension._window is not None
         controller: ToolController = extension._controller
         toolbox: ToolBoxWindow = extension._window
-        assert not toolbox._plane_frame.visible
+
+        # Canvas controls stay available independently of the active tool.
+        def check_canvas() -> None:
+            assert toolbox._canvas._frame is not None and toolbox._canvas._frame.visible
+            assert set(toolbox._canvas.checkboxes) == {"drawing_plane", "draw_on_object", "cursor_3d"}
+
+        check_canvas()
         await capture("startup")
 
         context: Any = omni.usd.get_context()
@@ -119,7 +125,8 @@ async def run() -> None:
                 panel._on_field_changed(0, 12.0)
                 values: tuple[float, float, float] | None = panel._read_values("move", "/World/Cube")
                 assert values is not None and values[0] == 12.0
-        assert toolbox._buttons["move"].visible and not toolbox._plane_frame.visible
+        assert toolbox._buttons["move"].visible
+        check_canvas()
         await capture("transform")
         report["sidebar_transform_edit"] = True
 
@@ -134,7 +141,7 @@ async def run() -> None:
         ):
             registry.execute_action("tool_box", action_id)
             await settle()
-            assert toolbox._plane_frame.visible
+            check_canvas()
             button: omni.ui.Button
             name: str
             for name, button in toolbox._buttons.items():
@@ -167,7 +174,7 @@ async def run() -> None:
         report["point_and_curve_drawing"] = True
         registry.execute_action("tool_box", "cancel")
         await settle()
-        assert not toolbox._plane_frame.visible
+        check_canvas()
         assert all(button.visible for button in toolbox._buttons.values())
         report["escape_restores_chooser"] = True
 

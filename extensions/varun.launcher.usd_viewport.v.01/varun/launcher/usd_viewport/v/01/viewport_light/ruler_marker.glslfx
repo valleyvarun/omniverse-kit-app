@@ -1,0 +1,34 @@
+-- glslfx version 0.1
+-- configuration
+{
+    "metadata": {"materialTag": "translucent"},
+    "parameters": {
+        "markerColor": {"default": [1.0, 0.69, 0.01]},
+        "markerOpacity": {"default": 1.0},
+        "markerGhost": {"default": 0.0}
+    },
+    "techniques": {"default": {
+        "surfaceShader": {"source": ["Marker.Surface"]},
+        "displacementShader": {"source": ["Marker.Displacement"]}
+    }}
+}
+-- glsl Marker.Surface
+vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+    // A fixed camera-space highlight makes the tiny marker read as a sphere.
+    vec3 normal = normalize(Neye);
+    vec3 light = normalize(vec3(-0.45, 0.65, 1.0));
+    float shade = 0.45 + 0.55 * max(dot(normal, light), 0.0);
+    float opacity = HdGet_markerOpacity();
+    return vec4(HdGet_markerColor() * shade * opacity, opacity);
+}
+-- glsl Marker.Displacement
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{
+    // The main sphere keeps its true depth; only the faint copy survives occlusion.
+    if (HdGet_markerGhost() < 0.5) return Peye;
+    mat4 projection = GetProjectionMatrix();
+    vec4 clip = projection * Peye;
+    clip.z = -clip.w * 0.9999;
+    return inverse(projection) * clip;
+}

@@ -8,14 +8,19 @@ import carb.settings
 import omni.ext
 import omni.kit.app
 import omni.kit.commands
-import omni.kit.stage_templates as stage_templates
-import omni.ui as ui
 import omni.usd
+from omni import ui
+from omni.kit import stage_templates
 from omni.kit.viewport.window import ViewportWindow
 from pxr import UsdUtils
 
 # Local imports
+from .frame_pacing import FramePacing
 from .hud import HudToggleButton
+from .navigation import MouseNavigation, NavigationButton
+from .orientation import OrientationGizmo
+from .ruler import RulerButton, UnitsButton
+from .touch import TouchNavigation
 from .viewport_light import ViewportLight
 
 # ----------------------------------------------------------------------
@@ -26,6 +31,9 @@ LIGHT_RIG = "Grey Studio"
 
 # per-stage mode cache maintained by the lighting menubar
 LIGHTING_MODE_KEY = "/exts/omni.kit.viewport.menubar.lighting/lightingMode/{stage_id}"
+
+# Kit's default up axis for new stages (Preferences > Stage); every viewport works Z-up
+UP_AXIS_SETTING: str = "/persistent/app/stage/upAxis"
 
 
 # ----------------------------------------------------------------------
@@ -42,13 +50,15 @@ class MyExtension(omni.ext.IExt):
     def on_startup(self, _ext_id: str) -> None:
         print("[varun.launcher.usd_viewport.v.01] Extension startup")
 
-        # --- 1) DISABLE AUTOMATIC RIG REPLACEMENT ---
+        # --- 1) DISABLE AUTOMATIC RIG REPLACEMENT AND MAKE Z THE UP AXIS ---
 
         # our ext-toml default loses to the menubar's (it loads first); force the value
         cast(Any, carb.settings.get_settings()).set(
             "/persistent/exts/omni.kit.viewport.menubar.lighting/autoLightRig/enabled",
             False,
         )
+        # new stages and viewport tabs are created Z-up; files saved Y-up keep their own axis
+        cast(Any, carb.settings.get_settings()).set(UP_AXIS_SETTING, "Z")
 
         # --- 2) CHOOSE RENDERERS AND CREATE THE VIEWPORT ---
 
@@ -70,13 +80,29 @@ class MyExtension(omni.ext.IExt):
             flags=flags,
         )
 
-        # --- 3) INSTALL LIGHTING AND HUD CONTROLS ---
+        # --- 3) INSTALL LIGHTING, HUD, AND RULER CONTROLS ---
 
         self._tasks = set()
         self._light_viewport = ViewportLight(self._window, lambda: self._track_task(self._apply_light_rig()))
         self._hud = HudToggleButton()
+        # ruler numbers in metres (default) or millimetres, and a toggle for the 3D ruler (on by default)
+        self._units: UnitsButton = UnitsButton()
+        self._ruler: RulerButton = RulerButton()
 
-        # --- 4) WATCH STAGES AND SCHEDULE STARTUP ---
+        # --- 4) ENABLE MOUSE, TOUCH, AND ORIENTATION CONTROLS ---
+
+        # one finger pans, pinch zooms, two fingers orbit; touch never selects or draws
+        self._touch: TouchNavigation = TouchNavigation(self._window)
+        self._navigation_button: NavigationButton = NavigationButton()
+        self._navigation: MouseNavigation = MouseNavigation(self._window)
+        self._orientation: OrientationGizmo = OrientationGizmo(self._window, lambda: self._light_viewport.active)
+
+        # --- 5) KEEP THE APP LIGHT WHILE IDLE ---
+
+        # like Blender: 60 Hz while working, and no redrawing while nothing changes
+        self._pacing: FramePacing = FramePacing(self._window)
+
+        # --- 6) WATCH STAGES AND SCHEDULE STARTUP ---
 
         # every opened or attached stage gets the light rig
         self._stage_events = (
@@ -104,9 +130,8 @@ class MyExtension(omni.ext.IExt):
 
     # Restore RTX lighting after a stage opens outside Light mode.
     def _on_stage_event(self, event: Any) -> None:
-        if event.type == int(omni.usd.StageEventType.OPENED):
-            if not self._light_viewport.active:
-                self._track_task(self._apply_light_rig())
+        if event.type == int(omni.usd.StageEventType.OPENED) and not self._light_viewport.active:
+            self._track_task(self._apply_light_rig())
 
     # apply the tab's saved lighting mode, or the default rig
     async def _apply_light_rig(self) -> None:
@@ -150,7 +175,14 @@ class MyExtension(omni.ext.IExt):
         for task in self._tasks:
             task.cancel()
         self._tasks.clear()
-        # Release menu controls and appearance before destroying the viewport.
+        # Restore Kit's frame rates, then release controls, touch input, and appearance before the viewport.
+        self._pacing.destroy()
         self._hud.destroy()
+        self._units.destroy()
+        self._ruler.destroy()
+        self._orientation.destroy()
+        self._navigation.destroy()
+        self._navigation_button.destroy()
+        self._touch.destroy()
         self._light_viewport.destroy()
         self._window.destroy()

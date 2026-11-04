@@ -13,9 +13,9 @@ from typing import Any
 import omni.kit.actions.core
 import omni.kit.app
 import omni.kit.renderer.capture
+import omni.kit.ui_test
 import omni.kit.widget.layers
-from omni import ui
-from omni.kit import ui_test
+import omni.ui
 from pxr import UsdGeom
 
 
@@ -46,18 +46,18 @@ async def run() -> None:
         await settle(4)
 
     def docked() -> None:
-        clayers: Any = ui.Workspace.get_window("Clayers")
-        layer: Any = ui.Workspace.get_window("Layer")
-        stage: Any = ui.Workspace.get_window("Stage")
+        clayers: Any = omni.ui.Workspace.get_window("Clayers")
+        layer: Any = omni.ui.Workspace.get_window("Layer")
+        stage: Any = omni.ui.Workspace.get_window("Stage")
         assert clayers and layer and stage
         assert clayers.visible and layer.visible and stage.visible
         assert clayers.dock_id >= 0
         assert clayers.dock_id == layer.dock_id == stage.dock_id
-        assert clayers.position_x > ui.Workspace.get_window("Tool Box").position_x
+        assert clayers.position_x > omni.ui.Workspace.get_window("Tool Box").position_x
 
     def widget(kind: str, identifier: str) -> Any:
         item: Any
-        for item in ui_test.find_all(f"Clayers//Frame/**/{kind}[*]"):
+        for item in omni.kit.ui_test.find_all(f"Clayers//Frame/**/{kind}[*]"):
             if item.widget.identifier == identifier:
                 return item
         raise AssertionError(f"Missing Clayers widget: {identifier}")
@@ -75,7 +75,7 @@ async def run() -> None:
             control: Any
             for column in ("V", "L", "A"):
                 header: Any = widget("Label", f"clayers_header_{column}")
-                for control in ui_test.find_all("Clayers//Frame/**/InvisibleButton[*]"):
+                for control in omni.kit.ui_test.find_all("Clayers//Frame/**/InvisibleButton[*]"):
                     if control.widget.identifier == f"clayers_{column}:{row.key}":
                         assert abs(control.center.x - header.center.x) < 1, f"{column} misaligned: {row.name}"
                         assert abs(control.center.y - name.center.y) < 1
@@ -112,7 +112,7 @@ async def run() -> None:
         await complete()
         first_stage: Any = model.stage
         assert first_stage == workspace._tabs[first].stage
-        ui.Workspace.get_window("Clayers").focus()
+        omni.ui.Workspace.get_window("Clayers").focus()
         await settle()
         check_alignment()
         geometry: Any = UsdGeom
@@ -138,8 +138,15 @@ async def run() -> None:
         row: Any
         for row in rows:
             keys.add(row.key)
-        assert "/World/DrawingPlanes/Plane_A" in keys and "/World/ThreeDDraw/Stroke_A" in keys
-        assert model.group_for("/World/ThreeDDraw/Stroke_A") is not None
+        assert "/World/DrawingPlanes/Plane_A" in keys and "/World/ThreeDDraw/Stroke_A" not in keys
+        owner: str = model.group_for("/World/ThreeDDraw/Stroke_A")
+        assert owner is not None
+        layer_key: str = model.stroke_layer_key(owner)
+        assert layer_key in keys
+        extension._panel._expanded.add(layer_key)
+        model.refresh()
+        await settle()
+        assert any(row.key == "/World/ThreeDDraw/Stroke_A" for row in model.rows(extension._panel._expanded))
         model.activate("/World/DrawingPlanes/Plane_A")
         assert model.planes.active_plane() == "/World/DrawingPlanes/Plane_A"
         model.set_visible("/World/DrawingPlanes/Plane_A", False)
@@ -169,7 +176,7 @@ async def run() -> None:
         report["header_and_control_alignment"] = True
         panel_title: str
         for panel_title in ("Layer", "Stage", "Clayers"):
-            panel_window: Any = ui.Workspace.get_window(panel_title)
+            panel_window: Any = omni.ui.Workspace.get_window(panel_title)
             panel_window.focus()
             await settle()
             assert model.stage == first_stage
@@ -222,10 +229,10 @@ async def run() -> None:
         registry.execute_action("varun.launcher.layout.v.01", "reset_default_layout")
         await settle(50)
         docked()
-        right_window: Any = ui.Workspace.get_window("Clayers")
-        right_bottom: Any = ui.Workspace.get_window("right_bottom_window")
+        right_window: Any = omni.ui.Workspace.get_window("Clayers")
+        right_bottom: Any = omni.ui.Workspace.get_window("right_bottom_window")
         assert right_bottom.visible and right_bottom.dock_id != right_window.dock_id
-        assert 100 < ui.Workspace.get_dock_id_height(right_window.dock_id) < 300
+        assert 100 < omni.ui.Workspace.get_dock_id_height(right_window.dock_id) < 300
         await capture("home-return")
         workspace._select_tab(second)
         await complete()
