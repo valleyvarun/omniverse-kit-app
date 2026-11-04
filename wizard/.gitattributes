@@ -1,0 +1,5 @@
+# Batch labels need CRLF line endings; the setup exe and icons are binary.
+*.bat text eol=crlf
+*.exe binary
+*.ico binary
+*.png binary

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drawing Intelligence – Download for Windows</title>
+  <meta name="description" content="Download the Windows installer for Drawing Intelligence, a work-in-progress 3D sketching app built on NVIDIA Omniverse Kit.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" type="image/png" href="imgs/plexus-logo.png">
+  <!-- Public Sans: open-licensed stand-in for NVIDIA Sans, which is used when installed -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/main.js" defer></script>
+</head>
+<body>
+
+  <!-- Institution bar -->
+  <div class="topbar">
+    <ul class="topbar-group">
+      <li>Columbia University</li>
+      <li>GSAPP</li>
+    </ul>
+    <ul class="topbar-group">
+      <li>MS CDP</li>
+      <li>Varun SA</li>
+    </ul>
+  </div>
+
+  <!-- Site header -->
+  <header class="site-header">
+    <a class="brand" href="./">
+      <img src="imgs/plexus-logo.png" alt="" width="34" height="34">
+      <span>Drawing Intelligence</span>
+    </a>
+    <a class="header-link" href="https://github.com/valleyvarun/omniverse-kit-app">
+      <span><span class="header-link-long">Source on </span>GitHub</span>
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M5.5 2.5 11 8l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    </a>
+  </header>
+
+  <div class="split">
+
+    <!-- Left half: title and download -->
+    <section class="hero" aria-labelledby="title">
+      <div class="hero-content">
+        <p class="eyebrow">Work in progress</p>
+        <h1 id="title">Drawing Intelligence</h1>
+        <p class="tagline">Sketch in 3D with a pen or mouse. Built on NVIDIA Omniverse Kit.</p>
+        <a class="download" href="wizard/dist/3D-Drawing-Setup.exe" download>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>
+          Download for Windows
+        </a>
+        <p class="download-note">Windows 10 or 11, 64-bit · Free</p>
+        <p class="os-note" id="os-note" hidden>
+          The installer runs on Windows only for now. Open this page on a Windows PC to install Drawing Intelligence.
+        </p>
+      </div>
+    </section>
+
+    <!-- Right half: instructions (scrolls on its own on wide screens) -->
+    <main class="details" tabindex="0" aria-label="Installation details">
+
+      <section>
+        <h2>Install in four steps</h2>
+        <ol class="steps">
+          <li>
+            <strong>Run the installer.</strong>
+            Windows may show “Windows protected your PC” because the installer isn’t code-signed yet.
+            Select <em>More info</em>, then <em>Run anyway</em>.
+          </li>
+          <li>
+            <strong>Accept NVIDIA’s license terms.</strong>
+            Drawing Intelligence runs on the NVIDIA Omniverse Kit SDK, which the installer downloads from NVIDIA.
+          </li>
+          <li>
+            <strong>Choose a folder and wait.</strong>
+            The first install needs about 4 GB of disk space and takes roughly 10–30 minutes, depending on your connection.
+            You don’t need administrator rights.
+          </li>
+          <li>
+            <strong>Open Drawing Intelligence.</strong>
+            Use the shortcut on your desktop or in the Start menu. The installer names it <em>3D Drawing (WIP)</em>.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>What the installer does</h2>
+        <ul class="list">
+          <li>Downloads NVIDIA’s <a href="https://github.com/NVIDIA-Omniverse/kit-app-template">Kit App Template</a> (version 109.0.3).</li>
+          <li>Replaces the template’s source folder with the app’s code from <a href="https://github.com/valleyvarun/omniverse-kit-app">this GitHub repository</a>.</li>
+          <li>Builds the app, which downloads the Kit SDK and extensions.</li>
+          <li>Adds a desktop shortcut and a Start menu entry.</li>
+        </ul>
+        <p>
+          The app goes in <code>%LOCALAPPDATA%\Programs\3D-Drawing</code>, or in <code>C:\3D-Drawing</code>
+          if your Windows user folder has a space in its name. You can choose another folder, but its path can’t
+          contain spaces because the Kit build tools don’t support them.
+        </p>
+      </section>
+
+      <section>
+        <h2>Requirements</h2>
+        <ul class="list">
+          <li>Windows 10 or 11, 64-bit</li>
+          <li>A graphics card with current drivers (an NVIDIA RTX GPU is recommended)</li>
+          <li>About 4 GB of free disk space</li>
+          <li>An internet connection during installation</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Update or uninstall</h2>
+        <p>
+          <strong>To update,</strong> download and run the installer again.
+          It replaces your installation with the latest version.
+        </p>
+        <p>
+          <strong>To uninstall,</strong> open Settings &gt; Apps &gt; Installed apps, find <em>3D Drawing (WIP)</em>, and select Uninstall.
+          Kit keeps shared downloads in <code>C:\packman-repo</code> and <code>%LOCALAPPDATA%\ov</code> for other Kit apps.
+          You can delete those folders if no other Kit app uses them.
+        </p>
+      </section>
+
+      <!-- Footer -->
+      <footer>
+        <p>
+          Drawing Intelligence is a work-in-progress project by Varun SA (MS CDP, Columbia University GSAPP),
+          published as <a href="https://github.com/valleyvarun">valleyvarun</a> on GitHub.
+          It is built on NVIDIA Omniverse Kit and is not affiliated with or endorsed by NVIDIA.
+          The Kit SDK is governed by the
+          <a href="https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/">NVIDIA Software License Agreement</a>
+          and the
+          <a href="https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-omniverse/">Product-Specific Terms for NVIDIA Omniverse</a>.
+        </p>
+      </footer>
+    </main>
+
+  </div>
+</body>
+</html>

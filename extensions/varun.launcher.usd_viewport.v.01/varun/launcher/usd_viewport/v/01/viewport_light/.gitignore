@@ -1,4 +1,8 @@
 _build/
-bin/
+# Ship the prebuilt plugin: installed copies have no compiler to build it.
+bin/*
+!bin/*/
+bin/*/*
+!bin/*/*.plugin.dll
 __pycache__/
 *.pyc
